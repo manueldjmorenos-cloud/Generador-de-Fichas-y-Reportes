@@ -1,0 +1,1829 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Generador de fichas y reportes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Diseño: una columna de trabajo en tres pasos (cargar, revisar, descargar). Azul marino y verde azulado de la ficha; amarillo = campo editable. */
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --fg: #1B2430; --muted: #5B6675; --line: #C9D3DF;
+  --navy: #1F3A5F; --teal: #2E7D8C; --prev: #EAF1F8; --fill: #FFF6DB; --fill-line: #E5CF86;
+  --warn: #B45F06; --warn-bg: #FDF0E0; --ok: #2F7D4F; --on-navy: #FFFFFF; --focus: #2E7D8C;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171F; --surface: #1A222D; --fg: #E7EBF1; --muted: #9AA6B6; --line: #33404F;
+  --navy: #8FB4E3; --teal: #5FB3C2; --prev: #1F2D3F; --fill: #3A3320; --fill-line: #7A6A33;
+  --warn: #F0A15A; --warn-bg: #3A2B1A; --ok: #6CC18C; --on-navy: #11171F; --focus: #5FB3C2; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11171F; --surface: #1A222D; --fg: #E7EBF1; --muted: #9AA6B6; --line: #33404F;
+  --navy: #8FB4E3; --teal: #5FB3C2; --prev: #1F2D3F; --fill: #3A3320; --fill-line: #7A6A33;
+  --warn: #F0A15A; --warn-bg: #3A2B1A; --ok: #6CC18C; --on-navy: #11171F; --focus: #5FB3C2; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 56px; }
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px; color: var(--navy); text-wrap: balance; font-weight: 600; }
+h2 { font-size: 17px; margin: 0; font-weight: 600; color: var(--navy); }
+h3 { font-size: 12px; margin: 0 0 8px; font-family: var(--mono); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; }
+.lead { color: var(--muted); max-width: 62ch; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.step-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tag { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.drop { border: 2px dashed var(--line); border-radius: 6px; padding: 28px 16px; text-align: center; background: var(--prev); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.drop.over { border-color: var(--teal); }
+.drop strong { font-weight: 600; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button, .btn { font: inherit; cursor: pointer; border-radius: 4px; padding: 9px 16px; border: 1px solid var(--navy); background: var(--navy); color: var(--on-navy); font-weight: 500; min-height: 40px; }
+button.sec { background: transparent; color: var(--navy); }
+button.sm { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+button.x { min-height: 30px; padding: 0 9px; background: transparent; color: var(--muted); border-color: var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+input[type=file]:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 2px; }
+.status { padding: 10px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--prev); }
+.status.warn { background: var(--warn-bg); border-color: var(--warn); color: var(--fg); }
+.status.ok { border-color: var(--ok); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 99px; background: var(--prev); }
+.chip.miss { border-color: var(--warn); background: var(--warn-bg); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 16px; }
+.f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.f label { font-size: 13px; color: var(--muted); }
+input[type=text], select, textarea { font: inherit; font-size: 14px; color: var(--fg); background: var(--fill); border: 1px solid var(--fill-line); border-radius: 4px; padding: 6px 8px; min-height: 36px; width: 100%; min-width: 0; }
+input.miss { border-color: var(--warn); background: var(--warn-bg); }
+textarea { min-height: 120px; font-family: var(--mono); font-size: 12px; background: var(--surface); border-color: var(--line); resize: vertical; }
+.listwrap { overflow-x: auto; }
+.list { display: flex; flex-direction: column; gap: 6px; min-width: 520px; }
+.lrow { display: grid; gap: 6px; align-items: center; }
+.lhead { font-size: 12px; color: var(--muted); }
+details { border-top: 1px solid var(--line); padding-top: 12px; }
+summary { cursor: pointer; font-weight: 500; color: var(--navy); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.sw { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--line); vertical-align: -1px; margin-right: 5px; }
+ol.how { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); }
+ul.warnl { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+.status b { font-weight: 600; }
+label.chk { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--fg); }
+label.chk input { width: 18px; height: 18px; }
+.tabs { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.tabs button { background: transparent; color: var(--navy); }
+.tabs button[aria-selected=true] { background: var(--navy); color: var(--on-navy); }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
+.rrow { display: grid; grid-template-columns: 1fr 100px 110px; gap: 8px; align-items: center; font-size: 14px; }
+.rrow span.pv { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+textarea.plain { font-family: var(--font); font-size: 14px; background: var(--fill); border-color: var(--fill-line); min-height: 70px; }
+.sumbox { font-family: var(--mono); font-size: 12px; min-height: 160px; background: var(--surface); border-color: var(--line); }
+.big { font-weight: 600; }
+.st-ok { border-color: var(--ok); } .st-alert { border-color: #B3261E; }
+</style>
+
+<main>
+  <header>
+    <h1>Generador de fichas y reportes de lote</h1>
+    <p class="lead">Carga la receta (BeerSmith, Brewer's Friend o Brewfather). Con ella descargas la ficha de producción antes de cocinar y, al terminar el lote, el reporte que compara lo real con lo previsto. Todo ocurre en tu navegador; la receta y los datos no se envían a ningún servidor.</p>
+    <div class="tabs" role="tablist" aria-label="Qué quieres generar">
+      <button type="button" role="tab" id="tab-ficha" aria-selected="true" aria-controls="out">Ficha de lote</button>
+      <button type="button" role="tab" id="tab-rep" aria-selected="false" aria-controls="rep">Reporte de lote</button>
+    </div>
+  </header>
+
+  <section class="step" aria-labelledby="s1">
+    <div class="step-head"><span class="tag">PASO 1</span><h2 id="s1">Carga la receta</h2></div>
+    <div class="drop" id="drop">
+      <p><strong>Arrastra aquí el archivo de la receta</strong> o elígelo.</p>
+      <div class="row" style="justify-content:center">
+        <input type="file" id="file" accept="application/pdf,.pdf,.txt,.htm,.html,.xml,.beerxml,text/plain,text/html,text/xml">
+        <label for="file" class="btn" role="button">Elegir archivo</label>
+        <button type="button" class="sec" id="sample">Probar con la receta de ejemplo</button>
+      </div>
+      <p class="note">Formatos: PDF de BeerSmith, Brewer's Friend o Brewfather; también TXT, HTML y BeerXML de Brewer's Friend. El ejemplo es una Blonde Ale de 120 L exportada desde BeerSmith.</p>
+      <button type="button" class="sec sm" id="blank">Descargar la plantilla neutra, sin datos de receta</button>
+    </div>
+    <details>
+      <summary>Pegar el texto de la receta en lugar del archivo</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <label for="paste" class="note">Abre la receta, selecciona todo el texto, cópialo y pégalo aquí. El formato se detecta solo.</label>
+        <textarea id="paste" spellcheck="false"></textarea>
+        <div><button type="button" class="sec sm" id="usePaste">Leer texto pegado</button></div>
+      </div>
+    </details>
+    <div id="msg" role="status" aria-live="polite" hidden></div>
+  </section>
+
+  <section class="step" id="review" aria-labelledby="s2" hidden>
+    <div class="step-head"><span class="tag">PASO 2</span><h2 id="s2">Revisa los datos leídos</h2></div>
+    <p class="lead">Compara con tu receta. Corrige lo que no coincida. Todo se muestra en unidades métricas (L, kg, g, °C), convertido si la receta venía en galones, libras u onzas. Lo que no aparece en la receta queda marcado en naranja y la ficha dirá «Sin dato en la ficha: preguntar al cervecero».</p>
+    <div class="chips" id="chips"></div>
+    <div id="warn1" class="status warn" hidden></div>
+    <div id="form" style="display:flex;flex-direction:column;gap:22px"></div>
+  </section>
+
+  <section class="step" id="out" aria-labelledby="s3" hidden>
+    <div class="step-head"><span class="tag">PASO 3</span><h2 id="s3">Descarga la ficha</h2></div>
+    <div class="legend" aria-label="Colores de la ficha">
+      <span><i class="sw" style="background:var(--prev)"></i>Azul: viene de la receta (previsto)</span>
+      <span><i class="sw" style="background:var(--fill)"></i>Amarillo: lo escribes tú (real)</span>
+      <span><i class="sw" style="background:#CDEFE7"></i>Verde «Ref.»: referencia general, no es de la receta</span>
+    </div>
+    <div id="warn3" class="status warn" hidden></div>
+    <div class="row"><button type="button" id="gen">Generar y descargar la bitácora en PDF</button></div>
+    <div id="genmsg" role="status" aria-live="polite" hidden></div>
+    <ol class="how">
+      <li>Abre el PDF con Adobe Acrobat Reader en tu teléfono, tablet o computadora.</li>
+      <li>Antes de empezar, lee el bloque de avisos de la página 1 y resuélvelo con el cervecero.</li>
+      <li>Escribe en las celdas amarillas durante la cocinada y marca las casillas.</li>
+      <li>Para una duda, pregunta al agente y, si hace falta, adjunta la ficha tal como la llevas.</li>
+    </ol>
+  </section>
+  <section class="step" id="rep" aria-labelledby="s4" hidden>
+    <div class="step-head"><span class="tag">PASO 3</span><h2 id="s4">Captura lo real y descarga el reporte</h2></div>
+    <p class="lead">Escribe solo lo que mediste; lo que dejes vacío queda como «sin dato». En gris verás el valor previsto de la receta. La página calcula las diferencias, el agua total, las tres mermas, el alcohol, la atenuación y una estimación de eficiencia. La interpretación se la pides al agente con el resumen de abajo.</p>
+    <div id="rform" style="display:flex;flex-direction:column;gap:22px"></div>
+    <div class="row"><button type="button" id="genrep">Generar y descargar el reporte en PDF</button><button type="button" class="sec" id="copysum">Copiar resumen para el agente</button></div>
+    <div id="repmsg" role="status" aria-live="polite" hidden></div>
+    <details><summary>Ver el resumen que se copia</summary><div style="margin-top:10px"><textarea id="sumtxt" class="sumbox" readonly spellcheck="false"></textarea></div></details>
+    <p class="note">El dictamen del reporte es solo una sugerencia calculada con referencias generales; la decisión final es del cervecero, que firma en la última página. Los colores verde, amarillo y rojo solo aparecen donde hay una referencia de la base de conocimiento.</p>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>/* Generador de ficha de lote v4: lectores (BeerSmith, Brewer's Friend, Brewfather, BeerXML), modelo normalizado en métrico,
+   agua en tres números, avisos, contenido de la ficha y PDF rellenable.
+   Funciona en navegador (window.FichaCore) y en Node (module.exports). Requiere pdf-lib 1.17.1. */
+(function (root) {
+'use strict';
+
+const SD = 'Sin dato en la ficha: preguntar al cervecero';
+const VERSION = 'v4.0';
+
+/* ====================== 0. UTILIDADES ====================== */
+
+// Agrupa los fragmentos de texto de pdf.js en líneas (arriba a abajo, izquierda a derecha).
+function linesFromItems(items) {
+  const its = items.filter(i => i && typeof i.str === 'string' && i.str.trim() !== '' && i.transform)
+    .map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width || 0 }));
+  its.sort((a, b) => b.y - a.y || a.x - b.x);
+  const lines = []; let cur = null;
+  for (const it of its) {
+    if (!cur || Math.abs(cur.y - it.y) > 2.5) { cur = { y: it.y, parts: [] }; lines.push(cur); }
+    cur.parts.push(it);
+  }
+  return lines.map(l => {
+    l.parts.sort((a, b) => a.x - b.x);
+    let out = '', end = null;
+    for (const p of l.parts) {
+      if (end !== null && p.x - end > 1.2 && !out.endsWith(' ')) out += ' ';
+      out += p.s; end = p.x + p.w;
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  });
+}
+
+function htmlToText(html) {
+  let t = String(html).replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, '');
+  t = t.replace(/<\/t[dh]>\s*<t[dh][^>]*>/gi, ' | ').replace(/<br\s*\/?>|<\/tr>|<\/p>|<\/div>|<\/h\d>|<\/table>|<\/li>/gi, '\n').replace(/<[^>]+>/g, '');
+  t = decodeEntities(t);
+  return t.split('\n').map(l => l.replace(/[ \t ]+/g, ' ').trim()).filter(Boolean).join('\n');
+}
+function decodeEntities(s) {
+  return String(s).replace(/&deg;/g, '°').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
+}
+
+const N = s => parseFloat(String(s).replace(',', '.'));
+const ok = x => typeof x === 'number' && isFinite(x);
+const G2L = 3.785411784, LB = 453.59237, OZ = 28.349523;
+const f2c = f => (f - 32) * 5 / 9;
+const round = (x, d) => { const p = Math.pow(10, d || 0); return Math.round(x * p) / p; };
+const trim0 = s => String(s).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+function volL(n, u) { u = (u || 'L').toLowerCase(); if (/^gal/.test(u)) return n * G2L; if (/^qt/.test(u)) return n * G2L / 4; if (/^ml/.test(u)) return n / 1000; return n; }
+function massG(n, u) { u = (u || 'g').toLowerCase(); if (/^lb/.test(u)) return n * LB; if (/^oz/.test(u)) return n * OZ; if (/^kg/.test(u)) return n * 1000; return n; }
+function tempC(n, u) { return /f/i.test(u || '') ? f2c(n) : n; }
+const clean = s => s.replace(/ /g, ' ').replace(/^[◯○●•▪□☐✓✔\s]+/, '').replace(/^[oO] (?=[A-Z0-9])/, '').replace(/\s+/g, ' ').trim();
+const NUM = '(\\d+(?:[.,]\\d+)?)';
+
+function newR(src) {
+  return {
+    src, imperial: false, name: '', style: '', type: '', typeBy: '', method: '', biab: false, brewer: '', equipment: '',
+    batchL: NaN, boilL: NaN, postBoilL: NaN, finalL: NaN, boilMin: NaN, effPct: NaN, mashEffPct: NaN,
+    og: NaN, fg: NaN, preSG: NaN, postSG: NaN, ibu: NaN, abv: NaN, carbVols: NaN, mashPH: NaN,
+    strikeL: NaN, strikeC: NaN, spargeL: NaN, spargeC: NaN, totalL: NaN, topOffL: NaN, absorbL: NaN, grainTempC: NaN,
+    ageDays: NaN, ageC: NaN, primingG: NaN, primingName: '', hydrate: '', waterIons: null, waterName: '',
+    grains: [], salts: [], misc: [], hops: [], yeast: [], mash: [], ferm: [], notes: [], platform: []
+  };
+}
+
+/* ====================== 1. DETECCIÓN DE FORMATO ====================== */
+
+function detectFormat(text) {
+  const t = String(text);
+  if (/<RECIPES?[\s>]/i.test(t) && /<(NAME|HOPS?|FERMENTABLES)>/i.test(t)) return 'beerxml';
+  if (/brewfather/i.test(t) && /(Fermentables|Mash Profile|Fermentation Profile)/i.test(t)) return 'brewfather';
+  if (/brewer'?s friend|brewersfriend\.com/i.test(t) || /Quick Water Requirements|Mash Guidelines|Water Requirements|HOME BREW RECIPE:/i.test(t)) return 'brewersfriend';
+  if (/BeerSmith|Prepare for Brewing|Water Prep|Mash Steps/i.test(t)) return 'beersmith';
+  return '';
+}
+const FORMAT_NAME = { beersmith: 'BeerSmith', brewersfriend: "Brewer's Friend", brewfather: 'Brewfather', beerxml: 'BeerXML' };
+
+/* ====================== 2. LECTORES ====================== */
+
+// ---- BeerSmith (PDF de la receta impresa) ----
+function parseRecipeBS(text) {
+  const L = text.split(/\r?\n/).map(clean).filter(l => l && !/Page \d+ of \d+$/i.test(l) && !/^file:\/\//i.test(l));
+  const r = { name: '', style: '', grains: [], saltsMash: [], saltsSparge: [], hops: [], mash: [], ferm: [], yeast: [], fining: [] };
+  if (L[0]) r.name = L[0];
+  r.brewer = ''; r.equipment = '';
+  if (L[1] && !/:/.test(L[1]) && L[1].length < 60) r.style = L[1];
+  let inMash = false, m;
+  for (const s of L) {
+    if ((m = /^Batch Size:\s*(.+?)(?:\s+Brewer:|$)/i.exec(s))) r.batch = m[1].replace(/ C$/, ' °C');
+    if ((m = /Brewer:\s*(.+)$/i.exec(s)) && !/Asst/i.test(s)) r.brewer = m[1].trim();
+    else if ((m = /^Equipment:\s*(.+)$/i.exec(s)) || (m = /Equipment:\s*(.+)$/i.exec(s))) r.equipment = m[1].trim();
+    if ((m = /^Boil Size:\s*(\S+ \S+)/i.exec(s))) r.boilSize = m[1];
+    else if ((m = /^Boil Time:\s*(\S+ \S+)/i.exec(s))) { r.boilTime = m[1]; if ((m = /Equipment:\s*(.+)$/i.exec(s))) r.equipment = m[1].trim(); }
+    else if ((m = /^End of Boil Vol:\s*(\S+ \S+)/i.exec(s))) r.postBoilVol = m[1];
+    else if ((m = /^Final Bottling Vol:\s*(\S+ \S+)/i.exec(s))) r.finalVol = m[1];
+    if ((m = /Efficiency:\s*([\d.,]+)\s*%/i.exec(s)) && !/Est Mash/i.test(s.slice(0, m.index + 3))) r.efficiency = m[1];
+    if ((m = /Est Mash Efficiency:\s*([\d.,]+)/i.exec(s))) r.mashEff = m[1];
+    if ((m = /^Total Water Needed:\s*(\S+ \S+)/i.exec(s))) r.totalWater = m[1];
+    if ((m = new RegExp('^' + NUM + ' (g|kg|oz|lb|ml|tsp|tbsp) (.+?) \\((Mash|Sparge)\\) Water Agent').exec(s))) {
+      (m[4] === 'Mash' ? r.saltsMash : r.saltsSparge).push({ name: m[3].replace(/\s*\([^)]*\)\s*$/, '').trim(), amt: N(m[1]), unit: m[2] });
+    }
+    else if ((m = new RegExp('^' + NUM + ' (kg|g|lb|oz) (.+?) (Grain|Sugar|Extract|Dry Extract|Adjunct)\\s+\\d+').exec(s))) {
+      r.grains.push({ name: m[3], amt: N(m[1]), unit: m[2] });
+    }
+    else if ((m = new RegExp('^' + NUM + ' (oz|g) (.+?)(?: \\[' + NUM + ' ?%\\])? - (.+?) Hop\\s+\\d+').exec(s))) {
+      const h = { name: m[3].trim(), alpha: m[4] ? N(m[4]) : NaN, amt: N(m[1]), unit: m[2], raw: m[5] };
+      let k;
+      if ((k = new RegExp('^Boil ' + NUM + ' min').exec(m[5]))) { h.kind = 'boil'; h.time = N(k[1]); }
+      else if ((k = new RegExp('^Steep/Whirlpool ' + NUM + ' min(?:, ' + NUM + ' (C|F))?').exec(m[5]))) { h.kind = 'whirlpool'; h.time = N(k[1]); h.temp = k[2] ? tempC(N(k[2]), k[3]) : NaN; }
+      else if ((k = new RegExp('^Dry Hop ' + NUM + ' Days').exec(m[5]))) { h.kind = 'dry'; h.time = N(k[1]); }
+      else if (/^First Wort/i.test(m[5])) { h.kind = 'fwh'; h.time = NaN; }
+      else { h.kind = 'other'; h.time = NaN; }
+      r.hops.push(h);
+    }
+    else if ((m = new RegExp('^' + NUM + ' (pkg|g|ml|oz|vial|tube|packet|pkgs) (.+?) Yeast\\s+\\d+').exec(s))) {
+      r.yeast.push({ amt: trim0(N(m[1])) + ' ' + m[2], name: m[3].replace(/\s*\[[^\]]*\]\s*/g, ' ').trim() });
+    }
+    else if ((m = new RegExp('^' + NUM + ' (\\w+) (.+?) Fining\\s+\\d+').exec(s))) {
+      r.fining.push({ name: m[3].trim(), amt: N(m[1]), unit: m[2] });
+    }
+    else if (/^Mash Steps/i.test(s)) { inMash = true; }
+    else if (/^(Sparge Water Acid|Fly sparge|Batch sparge|Add water|Estimated|Boil Ingredients)/i.test(s)) { inMash = false; }
+
+    if (inMash) {
+      if ((m = new RegExp('Add ' + NUM + ' (L|gal|qt) of water at ' + NUM + ' (C|F)\\s+' + NUM + ' (C|F)\\s+' + NUM + ' min').exec(s))) {
+        if (r.strikeVol === undefined) { r.strikeVol = volL(N(m[1]), m[2]); r.strikeTemp = tempC(N(m[3]), m[4]); }
+        r.mash.push({ temp: tempC(N(m[5]), m[6]), min: N(m[7]) });
+      } else if ((m = new RegExp(NUM + ' (C|F)\\s+' + NUM + ' min\\s*$').exec(s))) {
+        r.mash.push({ temp: tempC(N(m[1]), m[2]), min: N(m[3]) });
+      }
+    }
+    if ((m = new RegExp('sparge with ' + NUM + ' (L|gal|qt) water at ' + NUM + ' (C|F)', 'i').exec(s))) { r.spargeVol = volL(N(m[1]), m[2]); r.spargeTemp = tempC(N(m[3]), m[4]); }
+    if ((m = new RegExp('Add water to achieve boil volume of ' + NUM + ' (L|gal)', 'i').exec(s))) r.boilAdd = volL(N(m[1]), m[2]);
+    if ((m = new RegExp('pre-boil gravity is ' + NUM + ' SG', 'i').exec(s))) r.preBoilSG = N(m[1]);
+    if ((m = new RegExp('Estimated Post Boil Vol: ' + NUM + ' (L|gal) and Est Post Boil Gravity: ' + NUM + ' SG', 'i').exec(s))) { r.postBoilVol2 = volL(N(m[1]), m[2]); r.postBoilSG = N(m[3]); }
+    if ((m = new RegExp('achieve final volume of ' + NUM + ' (L|gal)', 'i').exec(s))) r.finalAdd = volL(N(m[1]), m[2]);
+    if ((m = new RegExp('Hydrate yeast with ' + NUM + ' (ml|L) warm water(?: and add optional ' + NUM + ' (g) of (.+))?', 'i').exec(s))) {
+      r.hydrate = 'Hidratar en ' + trim0(N(m[1])) + ' ' + m[2] + ' de agua tibia' + (m[3] ? ' con ' + trim0(N(m[3])) + ' ' + m[4] + ' de ' + m[5].trim() + ' (opcional)' : '');
+      if (m[3]) r.nutrient = { name: m[5].trim(), amt: N(m[3]), unit: m[4] };
+    }
+    if ((m = new RegExp('Original Gravity.*\\(Target: ' + NUM + ' SG\\)', 'i').exec(s))) r.og = N(m[1]);
+    if ((m = new RegExp('Actual Batch Volume.*\\(Target: ' + NUM + ' (L|gal)\\)', 'i').exec(s))) r.batchTarget = volL(N(m[1]), m[2]);
+    if ((m = new RegExp('(Primary|Secondary|Tertiary) Fermentation \\(' + NUM + ' days at ' + NUM + ' (C|F)', 'i').exec(s))) {
+      r.ferm.push({ kind: m[1].toLowerCase(), days: N(m[2]), temp: tempC(N(m[3]), m[4]) });
+    }
+    if ((m = new RegExp('Final Gravity:.*\\(Estimate: ' + NUM + ' SG\\)', 'i').exec(s))) r.fg = N(m[1]);
+    if ((m = /Carbonation:\s*(.+)$/i.exec(s))) r.carbo = m[1].trim();
+    if ((m = new RegExp('Age beer for ' + NUM + ' days at ' + NUM + ' (C|F)', 'i').exec(s))) r.age = { days: N(m[1]), temp: tempC(N(m[2]), m[3]) };
+  }
+  return r;
+}
+
+function readBeerSmith(text) {
+  const o = parseRecipeBS(text), R = newR('beersmith');
+  const pv = s => { const m = s && new RegExp(NUM + '\\s*(L|gal|qt)').exec(s); return m ? volL(N(m[1]), m[2]) : NaN; };
+  R.name = o.name; R.style = o.style; R.brewer = o.brewer; R.equipment = o.equipment;
+  let m;
+  if ((m = /Type:\s*(All Grain|Extract|Partial Mash|BIAB)/i.exec(text))) R.method = m[1];
+  if ((m = /Fermentation:\s*(Ale|Lager)/i.exec(text))) { R.type = m[1].toLowerCase(); R.typeBy = 'la receta (Fermentation)'; }
+  R.batchL = ok(o.batchTarget) ? o.batchTarget : pv(o.batch);
+  R.boilL = ok(o.boilAdd) ? o.boilAdd : pv(o.boilSize);
+  if (ok(pv(o.boilSize)) && ok(o.boilAdd) && Math.abs(pv(o.boilSize) - o.boilAdd) > 0.5) R.notes.push('BeerSmith: "Boil Size" (' + pv(o.boilSize).toFixed(1) + ' L) y el volumen de hervor del paso a paso (' + o.boilAdd.toFixed(1) + ' L) no coinciden; se usó el del paso a paso.');
+  R.postBoilL = ok(o.postBoilVol2) ? o.postBoilVol2 : pv(o.postBoilVol);
+  R.finalL = pv(o.finalVol); R.boilMin = N((o.boilTime || '').split(' ')[0]);
+  R.effPct = N(o.efficiency); R.mashEffPct = N(o.mashEff);
+  R.og = o.og; R.fg = o.fg; R.preSG = o.preBoilSG; R.postSG = o.postBoilSG;
+  R.totalL = pv(o.totalWater); R.strikeL = o.strikeVol; R.strikeC = o.strikeTemp; R.spargeL = o.spargeVol; R.spargeC = o.spargeTemp;
+  o.grains.forEach(g => R.grains.push({ name: g.name, kg: massG(g.amt, g.unit) / 1000 }));
+  const addSalts = (list, st) => list.forEach(s => R.salts.push({ name: s.name, g: massG(s.amt, s.unit), stage: st }));
+  addSalts(o.saltsMash, 'Empaste'); addSalts(o.saltsSparge, 'Lavado');
+  o.hops.forEach(h => R.hops.push({ name: h.name, alpha: h.alpha, g: massG(h.amt, h.unit), kind: h.kind, time: h.time, temp: h.temp }));
+  o.yeast.forEach(y => R.yeast.push({ name: y.name, amt: y.amt }));
+  o.fining.forEach(f => R.misc.push({ name: f.name, amt: trim0(f.amt) + ' ' + f.unit, stage: 'Hervor', time: NaN, kind: 'fining' }));
+  if (o.nutrient) R.misc.push({ name: o.nutrient.name, amt: trim0(o.nutrient.amt) + ' ' + o.nutrient.unit, stage: 'Hidratación', time: NaN, kind: 'nutrient' });
+  R.mash = o.mash.map(s => ({ name: '', tempC: s.temp, min: s.min }));
+  R.ferm = o.ferm.map(f => ({ kind: f.kind, days: f.days, tempC: f.temp }));
+  if (o.age) { R.ageDays = o.age.days; R.ageC = o.age.temp; }
+  R.hydrate = o.hydrate || '';
+  if (o.carbo) {
+    const b = new RegExp('^Bottle with ' + NUM + ' (oz|g) (.+)$', 'i').exec(o.carbo), k = new RegExp('^Keg with ' + NUM + ' (?:vols?|volumes?)', 'i').exec(o.carbo);
+    if (b) { R.primingG = massG(N(b[1]), b[2]); R.primingName = /corn sugar/i.test(b[3]) ? 'Azúcar de maíz' : b[3].trim(); }
+    else if (k) R.carbVols = N(k[1]);
+    else R.notes.push('Carbonatación en la receta: ' + o.carbo);
+  }
+  R.imperial = /\b(gal|oz|lb)\b/.test(text) && !/\b\d+(\.\d+)? (kg|L)\b/.test(text);
+  return R;
+}
+
+// ---- Brewer's Friend (PDF, texto, HTML) ----
+function readBrewersFriend(rawText) {
+  const text = decodeEntities(rawText).replace(/[ \t]*\|[ \t]*/g, ' ');
+  const L = text.split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const R = newR('brewersfriend'); R.imperial = true;
+  const first = (re, from) => { const m = re.exec(from === undefined ? text : from); return m; };
+  let m;
+  // nombre y cervecero
+  const tl = L.find(s => /^Title:/i.test(s));
+  if (tl) R.name = tl.replace(/^Title:\s*/i, '').trim();
+  else { const i = L.findIndex(s => !/^HOME BREW RECIPE/i.test(s)); R.name = L[i] || ''; if (L[i + 1] && !/:/.test(L[i + 1]) && L[i + 1].length < 40) R.brewer = L[i + 1]; }
+  if ((m = /(?:Brew )?Method:\s*(All Grain|BIAB|Extract|Partial Mash|Brew in a Bag)/i.exec(text))) R.method = m[1];
+  if ((m = /Style(?: Name)?:\s*(.+?)(?=\s+(?:Boil Time|Batch Size|Method)\s*:|$)/m.exec(text))) R.style = m[1].trim();
+  if ((m = /Boil Time:\s*(\d+)\s*min/i.exec(text))) R.boilMin = N(m[1]);
+  if ((m = new RegExp('Batch Size:\\s*' + NUM + '\\s*(gal\\w*|L|liters?)', 'i').exec(text))) R.batchL = volL(N(m[1]), m[2]);
+  const sizes = {}; const re1 = new RegExp('\\b(Pre Boil|Post Boil|Boil) Size:\\s*' + NUM + '\\s*(gal\\w*|L|liters?)', 'gi');
+  while ((m = re1.exec(text))) sizes[m[1].toLowerCase()] = volL(N(m[2]), m[3]);
+  R.boilL = sizes['pre boil'] ?? sizes['boil'] ?? NaN; R.postBoilL = sizes['post boil'] ?? NaN;
+  const grav = {}; const re2 = /\b(Pre |Post )?Boil Gravity:\s*(1\.\d+)/gi;
+  while ((m = re2.exec(text))) grav[(m[1] || 'pre').trim().toLowerCase()] = N(m[2]);
+  R.preSG = grav.pre ?? NaN; R.postSG = grav.post ?? NaN;
+  if ((m = /Efficiency:\s*(\d+(?:\.\d+)?)%/i.exec(text))) R.effPct = N(m[1]);
+  // OG, FG, ABV, IBU
+  const tryNum = (label, re) => { const mm = new RegExp(label + '\\s*(' + re + ')').exec(text); return mm ? N(mm[1]) : NaN; };
+  R.og = tryNum('Original Gravity:', '1\\.\\d+'); R.fg = tryNum('Final Gravity:', '1\\.\\d+');
+  R.abv = tryNum('ABV \\(standard\\):', '[\\d.]+(?=%)'); R.ibu = tryNum('IBU \\(tinseth\\):', '[\\d.]+');
+  if (!ok(R.og) && (m = /Original Gravity:\s*Final Gravity:[^\n]*\n\s*(1\.\d+)\s+(1\.\d+)\s+([\d.]+)%\s+([\d.]+)/.exec(text))) { R.og = N(m[1]); R.fg = N(m[2]); R.abv = N(m[3]); R.ibu = N(m[4]); }
+  if ((m = /Mash pH:?\s*(\d\.\d+)/i.exec(text)) && N(m[1]) > 3) R.mashPH = N(m[1]);
+  // fermentables
+  for (const s of L) {
+    let k;
+    if ((k = new RegExp('^' + NUM + ' (lbs?|oz|kg|g)\\s+(.+?)\\s+(?:\\$[\\d.]+\\s+)?' + NUM + '\\s+' + NUM + '\\s+' + NUM + '%$').exec(s)))
+      R.grains.push({ name: k[3].trim(), kg: massG(N(k[1]), k[2]) / 1000 });
+    else if ((k = new RegExp('^' + NUM + ' (lbs?|oz|kg|g)\\s+-\\s+(.+?)\\s+\\(' + NUM + '%\\)$').exec(s)))
+      R.grains.push({ name: k[3].trim(), kg: massG(N(k[1]), k[2]) / 1000 });
+    // lúpulos: PDF/HTML
+    else if ((k = new RegExp('^' + NUM + ' (oz|g)\\s+(.+?)\\s+(?:(Pellet|Whole|Leaf|Plug|Cryo[\\w ]*|Extract|T90|CO2 Extract)\\s+)?' + NUM + '\\s+(Boil|Whirlpool|Dry Hop|First Wort|Mash|Aroma|Hopstand|Hop Stand)(?:\\s+at\\s+' + NUM + '\\s*°?\\s*F)?\\s+' + NUM + '\\s*(min|days?|hours?)', 'i').exec(s))) {
+      R.hops.push(hopBF(k[3].trim(), N(k[5]), massG(N(k[1]), k[2]), k[6], N(k[8]), k[9], k[7] ? f2c(N(k[7])) : NaN));
+    }
+    // lúpulos: TXT
+    else if ((k = new RegExp('^' + NUM + ' (oz|g)\\s+-\\s+(.+?),\\s*Type:\\s*\\w+,\\s*AA:\\s*' + NUM + ',\\s*Use:\\s*(Boil|Whirlpool|Dry Hop|First Wort|Mash|Aroma|Hopstand|Hop Stand)(?:\\s+for\\s+' + NUM + '\\s*(min|days?|hours?))?(?:\\s+at\\s+' + NUM + '\\s*°?\\s*F)?', 'i').exec(s))) {
+      R.hops.push(hopBF(k[3].trim(), N(k[4]), massG(N(k[1]), k[2]), k[5], k[6] ? N(k[6]) : 0, k[7] || 'min', k[8] ? f2c(N(k[8])) : NaN));
+    }
+  }
+  // levadura
+  const yi = L.findIndex(s => /^Yeast:?$/i.test(s));
+  if (yi >= 0 && L[yi + 1]) {
+    const nm = L[yi + 1];
+    const am = /Amount:\s*(.+?)(?=\s+Cost:|\s+Attenuation|$)/.exec(text.slice(text.indexOf(nm)));
+    R.yeast.push({ name: nm, amt: am ? am[1].trim().replace(/^1 Each$/, '1 paquete') : '' });
+    if ((m = /(\d+(?:\.\d+)?) B cells required/i.exec(text))) R.yeast[0].cells = m[1] + ' mil millones de células';
+  }
+  if ((m = /Starter:\s*(Yes|No)/i.exec(text)) && /yes/i.test(m[1])) R.notes.push('La receta marca starter de levadura: preguntar al cervecero el tamaño y la preparación.');
+  if ((m = /CO2 Level:\s*(\d+(?:\.\d+)?)\s*Volumes/i.exec(text))) R.carbVols = N(m[1]);
+  // agua objetivo
+  if ((m = /Ca\+?2?:?\s*(\d+)\s+Mg\+?2?:?\s*(\d+)\s+Na\+?:?\s*(\d+)\s+Cl-?:?\s*(\d+)\s+SO4-?2?:?\s*(\d+)\s+HCO3-?:?\s*(\d+)/i.exec(text))) {
+    const v = m.slice(1, 7).map(N); if (v.some(x => x > 0)) R.waterIons = { Ca: v[0], Mg: v[1], Na: v[2], Cl: v[3], SO4: v[4], HCO3: v[5] };
+  }
+  // guía de macerado (PDF)
+  let mg = null;
+  if ((m = new RegExp(NUM + '\\s*gal\\s+Strike\\s+' + NUM + '\\s*°?\\s*F\\s+' + NUM + '\\s*°?\\s*F\\s+' + NUM + '\\s*min', 'i').exec(text))) mg = { strike: volL(N(m[1]), 'gal'), start: f2c(N(m[2])), target: f2c(N(m[3])), min: N(m[4]) };
+  if (mg) { R.strikeC = mg.start; R.mash.push({ name: '', tempC: mg.target, min: mg.min }); R.platform.guideStrikeL = mg.strike; }
+  if ((m = new RegExp(NUM + '\\s*gal\\s+Sparge\\s+--\\s+' + NUM + '\\s*°?\\s*F', 'i').exec(text))) { R.spargeC = f2c(N(m[2])); R.platform.guideSpargeL = volL(N(m[1]), 'gal'); }
+  if ((m = new RegExp('Starting Grain Temp:\\s*' + NUM + '\\s*°?\\s*F', 'i').exec(text))) R.grainTempC = f2c(N(m[1]));
+  // tabla de requerimientos de agua
+  const wrow = re => {
+    const line = L.find(s => re.test(s)); if (!line) return NaN;
+    const t = line.replace(/\([^)]*\)/g, ' ').replace(/,/g, ' ');
+    let k = /(-?\d+(?:\.\d+)?)\s*gal/.exec(t); if (k) return N(k[1]);
+    k = /(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*$/.exec(t); return k ? N(k[1]) : NaN;
+  };
+  const g = x => ok(x) ? x * G2L : NaN;
+  const wStrike = g(wrow(/^Strike water volume (?:at |\()/)), wSparge = g(wrow(/^Remaining sparge water volume/)), wPre = g(wrow(/^Pre boil volume/i));
+  R.strikeL = wStrike; R.spargeL = wSparge; R.totalL = g(wrow(/^Total( Water Needed)?:?\s/i));
+  if (ok(wPre)) R.boilL = wPre;
+  if (!ok(R.postBoilL)) R.postBoilL = g(wrow(/^Post boil Volume/i));
+  R.topOffL = g(wrow(/^Top off amount/i)); R.absorbL = Math.abs(g(wrow(/^Grain absorption losses/i)));
+  const ferm = g(wrow(/^(Going into fermentor|Volume into fermentor)/i));
+  if (!ok(R.batchL) && ok(ferm)) R.batchL = ferm;
+  if (R.method && /biab|bag/i.test(R.method)) R.biab = true;
+  // avisos de la plataforma
+  const reW = /WARNING:\s*(.+?\.|[^\n]+)/g; let w; const seen = {};
+  while ((w = reW.exec(text))) { const msg = w[1].trim().replace(/\s+/g, ' '); if (!seen[msg]) { seen[msg] = 1; R.platform.push(msg); } }
+  if (/Equipment Profile Used:\s*System Default/i.test(text)) R.platform.systemDefault = true;
+  if ((m = /Equipment Profile Used:\s*(.+)$/im.exec(text)) && !/System Default/i.test(m[1])) R.equipment = m[1].trim();
+  if (/Mash Guidelines/i.test(text) && ok(R.platform.guideStrikeL) && ok(R.strikeL) && Math.abs(R.platform.guideStrikeL - R.strikeL) / R.strikeL > 0.05) {
+    R.platform.guideMismatch = { strike: R.platform.guideStrikeL, sparge: R.platform.guideSpargeL, reqStrike: R.strikeL, reqSparge: R.spargeL };
+  }
+  return R;
+}
+function hopBF(name, alpha, g, use, time, unit, tc) {
+  const u = /dry/i.test(use) ? 'dry' : /whirl|hop ?stand|aroma/i.test(use) ? 'whirlpool' : /first/i.test(use) ? 'fwh' : /mash/i.test(use) ? 'other' : 'boil';
+  let t = time; if (/day/i.test(unit)) t = time; else if (/hour/i.test(unit)) t = u === 'dry' ? time / 24 : time * 60;
+  return { name, alpha, g, kind: u, time: u === 'fwh' ? NaN : t, temp: tc };
+}
+
+// ---- Brewfather (PDF a dos columnas) ----
+function readBrewfather(rawText) {
+  const text = decodeEntities(rawText).replace(/’/g, "'");
+  const R = newR('brewfather'); R.imperial = /°F|\bgal\b|\blb\b/.test(text);
+  const L = text.split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+    .map(s => s.replace(/\s+(Measurements|Mash pH:|Boil Volume:|Pre-Boil Gravity:|Post-Boil Kettle Volume:|Original Gravity:|Fermenter Top-Up:|Fermenter Volume:|Final Gravity:|Bottling Volume:|Mash Profile|Fermentation Profile)\s*$/i, ''));
+  let m;
+  const ti = L.findIndex(s => /^Caesar|\s-\s\d+(\.\d+)?%$/.test(s) && !/^(Generated|www)/i.test(s));
+  const t0 = L.findIndex(s => /\s-\s\d+(\.\d+)?%$/.test(s) && !/^(Generated|www|\d)/i.test(s));
+  if (t0 >= 0) { R.name = L[t0].replace(/\s-\s\d+(\.\d+)?%$/, ''); if ((m = /(\d+(?:\.\d+)?)%$/.exec(L[t0]))) R.abv = N(m[1]); if (L[t0 + 1] && !/:/.test(L[t0 + 1])) R.style = L[t0 + 1]; }
+  const gv = (label, unit) => { const mm = new RegExp(label + '\\s*:\\s*' + NUM + '\\s*' + (unit || '(gal|L)'), 'i').exec(text); return mm ? volL(N(mm[1]), mm[2]) : NaN; };
+  R.batchL = gv('Batch Size'); R.boilL = gv('Boil Size'); R.postBoilL = gv('Post-Boil Vol');
+  R.strikeL = gv('Mash Water'); R.spargeL = gv('Sparge Water(?! Temp)'); R.totalL = gv('Total Water');
+  if ((m = new RegExp('Sparge Water Temp\\s*:\\s*' + NUM + '\\s*°?\\s*(F|C)', 'i').exec(text))) R.spargeC = tempC(N(m[1]), m[2]);
+  if ((m = /Author:\s*(.+?)(?=\s+Batch Size|$)/m.exec(text))) R.brewer = m[1].trim();
+  if ((m = /Type:\s*(All Grain|Extract|Partial Mash|BIAB)/i.exec(text))) R.method = m[1];
+  if ((m = /Boil Time\s*:\s*(\d+)\s*min/i.exec(text))) R.boilMin = N(m[1]);
+  const gsg = label => { const mm = new RegExp(label + '\\s*:\\s*(1\\.\\d+)').exec(text); return mm ? N(mm[1]) : NaN; };
+  R.preSG = gsg('Pre-Boil Gravity'); R.og = gsg('Original Gravity'); R.fg = gsg('Final Gravity');
+  if ((m = /Brewhouse Efficiency:\s*(\d+(?:\.\d+)?)%/i.exec(text))) R.effPct = N(m[1]);
+  if ((m = /Mash Efficiency:\s*(\d+(?:\.\d+)?)%/i.exec(text))) R.mashEffPct = N(m[1]);
+  if ((m = /Carbonation\s*:\s*(\d+(?:\.\d+)?)\s*CO2-vol/i.exec(text))) R.carbVols = N(m[1]);
+  if ((m = /IBU\s*:\s*(\d+(?:\.\d+)?)/i.exec(text))) R.ibu = N(m[1]);
+  if ((m = /Mash pH:\s*(\d\.\d+)/i.exec(text))) R.mashPH = N(m[1]);
+  // línea combinada de estilo y equipo
+  const si = L.findIndex(s => /ANVIL|Grainfather|Foundry|batch|BIAB|Speidel|Robobrew|Brewzilla/i.test(s) && !/:/.test(s));
+  if (si >= 0) R.style = L[si];
+  // masa de ingredientes
+  const amt = s => { let g = 0, mm; if ((mm = /(\d+(?:\.\d+)?)\s*kg/.exec(s))) g += N(mm[1]) * 1000; if ((mm = /(\d+(?:\.\d+)?)\s*lb/.exec(s))) g += N(mm[1]) * LB; if ((mm = /(\d+(?:\.\d+)?)\s*oz/.exec(s))) g += N(mm[1]) * OZ; return g; };
+  let sect = '';
+  const sectRe = /^(Fermentables|Hops|Hop Stand|Dry Hops|Miscellaneous|Yeast|Starter|Water Profile)\b/i;
+  const mashRaw = [];
+  for (const s0 of L) {
+    const s = s0; let k;
+    if ((k = sectRe.exec(s)) && s.length < 40 || (k = /^(Fermentables|Hops|Dry Hops|Miscellaneous|Yeast|Water Profile)\b/i.exec(s))) { sect = k[1].toLowerCase(); }
+    // fermentables
+    if ((k = /^((?:\d+(?:\.\d+)? (?:lb|kg|g|oz) ?)+)- (.+?) \d+(?:\.\d+)? °L \((\d+(?:\.\d+)?)%\)/.exec(s))) R.grains.push({ name: k[2].trim(), kg: amt(k[1]) / 1000 });
+    else if ((k = /^((?:\d+(?:\.\d+)? (?:lb|kg|g|oz) ?)+)- (\d+) min - Boil - (.+)$/.exec(s))) R.grains.push({ name: k[3].replace(/\s+(Medium|High|Low|Very High)\s+fermentability.*$/i, '').replace(/^Corn Sugar \(Dextr\.{0,3}.*$/i, 'Corn Sugar (Dextrose)').trim(), kg: amt(k[1]) / 1000, boilMin: N(k[2]) });
+    // lúpulos
+    else if ((k = new RegExp('^' + NUM + ' min - ' + NUM + ' g - (.+?) - ' + NUM + '(?:%|\\.{2,}|…)?\\s*(?:\\((\\d+) IBU\\))?').exec(s)) && /^Hops/i.test(sect)) R.hops.push({ name: k[3].trim(), alpha: N(k[4]), g: N(k[2]), kind: 'boil', time: N(k[1]), temp: NaN, trunc: /\.{2,}|…/.test(s) });
+    else if ((k = new RegExp('^' + NUM + ' min ' + NUM + ' °F - ' + NUM + ' g - (.+?) - ' + NUM + '%').exec(s))) R.hops.push({ name: k[4].trim(), alpha: N(k[5]), g: N(k[3]), kind: 'whirlpool', time: N(k[1]), temp: f2c(N(k[2])) });
+    else if ((k = new RegExp('^' + NUM + ' days? - ' + NUM + ' g - (.+?) - ' + NUM + '%').exec(s))) R.hops.push({ name: k[3].trim(), alpha: N(k[4]), g: N(k[2]), kind: 'dry', time: N(k[1]), temp: NaN });
+    // misceláneos
+    else if ((k = new RegExp('^(Mash|Sparge|Boil|Primary|Secondary|Bottling|Keg) - ' + NUM + ' (g|ml|kg|tsp|tbsp|each|pkg|oz) - (.+)$', 'i').exec(s))) pushMisc(R, cap(k[1]), N(k[2]), k[3], k[4].trim(), NaN);
+    else if ((k = new RegExp('^' + NUM + ' min - (Boil|Mash|Sparge) - ' + NUM + ' (g|ml|kg|tsp|tbsp|each|pkg|oz) - (.+)$', 'i').exec(s))) pushMisc(R, cap(k[2]), N(k[3]), k[4], k[5].trim(), N(k[1]));
+    // levadura y starter
+    else if ((k = /^(\d+(?:\.\d+)?) (pkg|g|ml|vial) - (.+)$/.exec(s)) && /^yeast|starter/i.test(sect)) R.yeast.push({ name: k[3].trim(), amt: trim0(N(k[1])) + ' ' + (k[2] === 'pkg' ? 'paquete' : k[2]) });
+    else if ((k = /^Step 1:\s*(\d+(?:\.\d+)?) L \((.+?)\)/.exec(s))) R.starter = { L: N(k[1]), detail: k[2] };
+    else if ((k = /^(\d+(?:\.\d+)?) billion yeast cells/.exec(s))) R.starterCells = N(k[1]);
+    // agua objetivo
+    else if ((k = /Ca (\d+) Mg (\d+) Na (\d+) Cl (\d+) SO\d? (\d+)/.exec(s))) R.waterIons = { Ca: N(k[1]), Mg: N(k[2]), Na: N(k[3]), Cl: N(k[4]), SO4: N(k[5]) };
+    // fermentación
+    if ((k = new RegExp(NUM + ' °F - ' + NUM + ' days? - (Primary|Secondary|Conditioning|Tertiary)', 'i').exec(s))) R.ferm.push({ kind: k[3].toLowerCase(), days: N(k[2]), tempC: f2c(N(k[1])) });
+    // macerado
+    let mm;
+    if ((mm = new RegExp(NUM + ' °F - Strike Temp', 'i').exec(s))) R.strikeC = f2c(N(mm[1]));
+    if ((mm = new RegExp(NUM + ' °F - ' + NUM + ' min - ([\\w ]+)$').exec(s))) mashRaw.push({ tempC: f2c(N(mm[1])), min: N(mm[2]), name: mm[3].trim() });
+  }
+  if ((m = /Fermentation Profile\s*\n?\s*(Ale|Lager)/i.exec(rawText))) { R.type = m[1].toLowerCase(); R.typeBy = 'la receta (perfil de fermentación)'; }
+  // pasos de macerado: agrupar consecutivos con la misma temperatura
+  const mash = [];
+  mashRaw.forEach(st => {
+    const prev = mash[mash.length - 1], isOut = /mash out/i.test(st.name);
+    if (prev && !prev.out && !isOut && Math.abs(prev.tempC - st.tempC) < 0.3) { prev.min += st.min; prev.grouped = (prev.grouped || 1) + 1; }
+    else mash.push({ name: isOut ? 'Mash-out' : '', tempC: st.tempC, min: st.min, out: isOut });
+  });
+  R.mash = mash;
+  if (mash.some(s => s.grouped)) R.notes.push('Brewfather lista ' + mashRaw.filter(s => !/mash out/i.test(s.name)).length + ' pasos de macerado a la misma temperatura: la ficha los agrupa en uno con el tiempo total.');
+  if (R.starter) R.hydrate = 'Starter de ' + trim0(R.starter.L) + ' L (' + R.starter.detail + ')' + (R.starterCells ? ', unos ' + R.starterCells + ' mil millones de células' : '');
+  if (L.some(s => /\.{3}|…/.test(s))) R.notes.push('Brewfather recorta los nombres largos con "…" en el PDF: revisar los nombres de ingredientes y completarlos en el paso 2.');
+  if (R.style && !R.type && /ale/i.test(R.style)) { /* se infiere después */ }
+  return R;
+}
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const SALT_RE = /calcium chloride|gypsum|calcium sulfate|epsom|magnesium sulfate|magnesium chloride|chalk|calcium carbonate|baking soda|sodium bicarbonate|table salt|^salt\b|sodium chloride|pickling lime|calcium hydroxide|lye/i;
+function pushMisc(R, stage, n, unit, name, time) {
+  const g = /^(g|kg|oz)$/i.test(unit) ? massG(n, unit) : NaN;
+  if (SALT_RE.test(name) && /^(Mash|Sparge|Boil)$/i.test(stage) && ok(g)) R.salts.push({ name, g, stage: stage === 'Mash' ? 'Empaste' : stage === 'Sparge' ? 'Lavado' : 'Hervor' });
+  else R.misc.push({ name, amt: trim0(n) + ' ' + unit, stage: stage === 'Mash' ? 'Empaste' : stage === 'Sparge' ? 'Lavado' : stage === 'Boil' ? 'Hervor' : stage, time });
+}
+
+// ---- BeerXML ----
+function readBeerXML(xml) {
+  const R = newR('beerxml');
+  const rec = (/<RECIPE>([\s\S]*?)<\/RECIPE>/i.exec(xml) || [0, xml])[1];
+  const tag = (b, t) => { const m = new RegExp('<' + t + '>([\\s\\S]*?)</' + t + '>', 'i').exec(b); return m ? decodeEntities(m[1]).trim() : ''; };
+  const blocks = (b, t) => { const out = [], re = new RegExp('<' + t + '>([\\s\\S]*?)</' + t + '>', 'gi'); let m; while ((m = re.exec(b))) out.push(m[1]); return out; };
+  const nn = (b, t) => { const s = tag(b, t); const n = parseFloat(s); return isFinite(n) ? n : NaN; };
+  R.name = tag(rec, 'NAME') || (tag(xml, 'NAME'));
+  R.method = tag(rec, 'TYPE'); R.brewer = tag(rec, 'BREWER');
+  R.batchL = nn(rec, 'BATCH_SIZE'); R.boilL = nn(rec, 'BOIL_SIZE'); R.boilMin = nn(rec, 'BOIL_TIME'); R.effPct = nn(rec, 'EFFICIENCY');
+  R.og = nn(rec, 'OG'); R.fg = nn(rec, 'FG'); R.ibu = nn(rec, 'IBU'); R.abv = nn(rec, 'EST_ABV');
+  R.carbVols = nn(rec, 'CARBONATION');
+  const style = (/<STYLE>([\s\S]*?)<\/STYLE>/i.exec(rec) || [0, ''])[1];
+  R.style = tag(style, 'NAME'); const st = tag(style, 'TYPE');
+  if (/lager/i.test(st)) { R.type = 'lager'; R.typeBy = 'el estilo del archivo'; } else if (/ale/i.test(st)) { R.type = 'ale'; R.typeBy = 'el estilo del archivo'; }
+  const ferm = (/<FERMENTABLES>([\s\S]*?)<\/FERMENTABLES>/i.exec(rec) || [0, ''])[1];
+  blocks(ferm, 'FERMENTABLE').forEach(b => R.grains.push({ name: tag(b, 'NAME'), kg: nn(b, 'AMOUNT'), boilMin: /true/i.test(tag(b, 'ADD_AFTER_BOIL')) ? 0 : undefined }));
+  const hops = (/<HOPS>([\s\S]*?)<\/HOPS>/i.exec(rec) || [0, ''])[1];
+  blocks(hops, 'HOP').forEach(b => {
+    const use = tag(b, 'USER_HOP_USE') || tag(b, 'USE'), time = nn(b, 'TIME'), hu = nn(b, 'HOP_TEMP');
+    const h = hopBF(tag(b, 'NAME'), nn(b, 'ALPHA'), nn(b, 'AMOUNT') * 1000, use, /dry/i.test(use) ? time / 1440 : time, 'min', isFinite(hu) ? hu : NaN);
+    R.hops.push(h);
+  });
+  const miscs = (/<MISCS>([\s\S]*?)<\/MISCS>/i.exec(rec) || [0, ''])[1];
+  blocks(miscs, 'MISC').forEach(b => {
+    const isW = /true/i.test(tag(b, 'AMOUNT_IS_WEIGHT')), a = nn(b, 'AMOUNT'), use = tag(b, 'USE');
+    pushMisc(R, use || 'Boil', isW ? a * 1000 : a * 1000, isW ? 'g' : 'ml', tag(b, 'NAME'), nn(b, 'TIME'));
+  });
+  const mash = (/<MASH>([\s\S]*?)<\/MASH>/i.exec(rec) || [0, ''])[1];
+  R.grainTempC = nn(mash, 'GRAIN_TEMP');
+  blocks(mash, 'MASH_STEP').forEach(b => {
+    R.mash.push({ name: tag(b, 'NAME'), tempC: nn(b, 'STEP_TEMP'), min: nn(b, 'STEP_TIME'), out: /out/i.test(tag(b, 'NAME')) });
+    const inf = nn(b, 'INFUSE_AMOUNT'); if (!ok(R.strikeL) && ok(inf) && /infus/i.test(tag(b, 'TYPE'))) R.strikeL = inf;
+  });
+  const ys = (/<YEASTS>([\s\S]*?)<\/YEASTS>/i.exec(rec) || [0, ''])[1];
+  blocks(ys, 'YEAST').forEach(b => {
+    R.yeast.push({ name: [tag(b, 'LABORATORY'), tag(b, 'NAME')].filter(Boolean).join(' - '), amt: '' });
+    R.platform.yeastForm = tag(b, 'FORM');
+  });
+  if (R.yeast.length) R.notes.push('BeerXML no trae una cantidad de levadura confiable: la ficha la deja como "Sin dato".');
+  const w = (/<WATER>([\s\S]*?)<\/WATER>/i.exec(rec) || [0, ''])[1];
+  if (w) { const ions = { Ca: nn(w, 'CALCIUM'), Mg: nn(w, 'MAGNESIUM'), Na: nn(w, 'SODIUM'), Cl: nn(w, 'CHLORIDE'), SO4: nn(w, 'SULFATE'), HCO3: nn(w, 'BICARBONATE') }; if (Object.values(ions).some(x => x > 0)) R.waterIons = ions; }
+  R.imperial = /<DISPLAY_BATCH_SIZE>[^<]*gal/i.test(xml);
+  R.notes.push('BeerXML no trae volúmenes de empaste y lavado ni temperaturas de macerado: esos datos quedan como "Sin dato".');
+  return R;
+}
+
+/* ====================== 3. TIPO, AGUA, AVISOS ====================== */
+
+const LAGER_STYLE = /\b(lager|pilsner?|pils|helles|m[aä]rzen|festbier|oktoberfest|bock(?!.*weizen)|dunkel(?!.*weizen)|schwarzbier|kellerbier|zwickel|rauchbier|baltic porter|vienna)\b/i;
+const LAGER_YEAST = /lager|34\/70|w-?34|saflager|s-?23|s-?189|2124|2206|2278|wlp8\d\d|wy2\d{3}|bohemian|pilsner/i;
+function inferType(R) {
+  if (R.type) return;
+  if (/weizenbock|dunkelweizen|kolsch|k[öo]lsch|altbier|cream ale/i.test(R.style)) { R.type = 'ale'; R.typeBy = 'el estilo'; return; }
+  if (LAGER_STYLE.test(R.style) || LAGER_STYLE.test(R.name)) { R.type = 'lager'; R.typeBy = 'el estilo'; return; }
+  if (R.yeast.some(y => LAGER_YEAST.test(y.name))) { R.type = 'lager'; R.typeBy = 'la levadura'; return; }
+  const ft = R.ferm.map(f => f.tempC).filter(ok);
+  if (ft.length) { R.type = Math.min(...ft) <= 14 ? 'lager' : 'ale'; R.typeBy = 'la temperatura de fermentación'; return; }
+  if (/\b(ale|ipa|stout|porter|saison|wheat|weizen|pale|blonde|brown|amber|neipa|sour|tripel|dubbel)\b/i.test(R.style + ' ' + R.name)) { R.type = 'ale'; R.typeBy = 'el estilo'; return; }
+  if (R.yeast.some(y => /ale|us-?05|a38|s-?04|safale|1056|1098|1318|wlp0\d\d/i.test(y.name))) { R.type = 'ale'; R.typeBy = 'la levadura'; }
+}
+
+const fnum1 = x => trim0(round(x, 1).toFixed(1));
+const grainKg = R => R.grains.filter(g => !g.boilMin && ok(g.kg)).reduce((a, g) => a + g.kg, 0);
+
+// agua en tres números por etapa
+function deriveWater(R) {
+  const W = { biab: !!R.biab || /biab|bag/i.test(R.method || ''), steps: [], warn: [], missing: false };
+  let strike = R.strikeL, sparge = R.spargeL, total = R.totalL;
+  if (W.biab) { if (!ok(strike)) strike = ok(total) ? total : NaN; sparge = 0; }
+  if (!ok(sparge) && ok(strike) && ok(total) && total > strike) { sparge = total - strike; W.derivedSparge = true; }
+  if (!ok(strike) && ok(sparge) && ok(total)) { strike = total - sparge; W.derivedStrike = true; }
+  if (!W.biab && ok(strike) && !ok(sparge) && ok(R.boilL) && !ok(total)) { /* sin lavado ni total: no se inventa */ }
+  W.strike = strike; W.sparge = sparge; W.total = total;
+  W.boil = R.boilL; W.cum = ok(strike) ? strike + (ok(sparge) ? sparge : 0) : NaN;
+  W.missing = !ok(strike);
+  const kg = grainKg(R); W.grainKg = kg;
+  if (ok(W.cum) && ok(total) && Math.abs(W.cum - total) / total > 0.02) W.warn.push('La suma de empaste y lavado (' + W.cum.toFixed(1) + ' L) no coincide con el agua total de la receta (' + total.toFixed(1) + ' L). Confirmar con el cervecero antes de agregar agua.');
+  if (ok(W.cum) && ok(W.boil)) {
+    W.retention = W.cum - W.boil;
+    if (W.retention < 0) W.warn.push('La receta pide llegar a ' + W.boil.toFixed(1) + ' L antes del hervor, pero el agua que suma (' + W.cum.toFixed(1) + ' L) no alcanza: faltarían ' + (-W.retention).toFixed(1) + ' L. No agregar por cuenta propia: preguntar al cervecero.');
+    else if (kg > 0) { W.perKg = W.retention / kg; if (W.perKg > 2 || W.perKg < 0.3) W.warn.push('La retención implícita de la receta (' + W.retention.toFixed(1) + ' L, ' + W.perKg.toFixed(1) + ' L por kg de grano) es muy distinta de la habitual: revisar los volúmenes con el cervecero.'); }
+  }
+  if (ok(strike) && kg > 0) { W.ratio = strike / kg; }
+  return W;
+}
+
+function analyze(R) {
+  inferType(R);
+  R.biab = R.biab || /biab|bag/i.test(R.method || '');
+  const W = deriveWater(R), warn = [];
+  const A = { water: W, warn, missing: [] };
+  const miss = (cond, txt) => { if (cond) A.missing.push(txt); };
+  miss(!R.name, 'nombre de la receta'); miss(!ok(R.batchL), 'volumen en el fermentador'); miss(!ok(R.boilL), 'volumen antes del hervor'); miss(!ok(R.postBoilL), 'volumen después del hervor');
+  miss(!ok(R.og), 'densidad inicial (OG)'); miss(!ok(R.fg), 'densidad final (FG)'); miss(!R.grains.length, 'maltas'); miss(!R.yeast.length, 'levadura');
+  miss(!ok(R.strikeL), 'volumen de agua de empaste'); miss(!R.biab && !ok(R.spargeL), 'volumen de agua de lavado'); miss(!ok(R.strikeC), 'temperatura del agua de empaste');
+  miss(!R.mash.length, 'temperaturas y tiempos de macerado'); miss(!R.biab && !ok(R.spargeC), 'temperatura del agua de lavado'); miss(!R.ferm.length, 'temperatura y días de fermentación');
+  miss(!ok(R.carbVols) && !ok(R.primingG), 'nivel de carbonatación'); miss(!ok(R.finalL), 'volumen final envasado'); miss(!ok(R.preSG), 'densidad antes del hervor'); miss(!ok(R.boilMin), 'tiempo de hervor');
+  if (!R.type) warn.push('No se pudo saber si es ale o lager: la ficha imprime las referencias de los dos. Indíquelo en el paso 2 si lo sabe.');
+  else if (R.typeBy) A.typeNote = 'Tipo (' + R.type + ') deducido de ' + R.typeBy + '.';
+  if (A.missing.length) warn.push('La receta no trae: ' + A.missing.join(', ') + '. En la ficha aparecen como "Sin dato en la ficha: preguntar al cervecero"; la ficha muestra la referencia de la base de conocimiento cuando existe, pero no la usa como valor de la receta.');
+  W.warn.forEach(w => warn.push(w));
+  if (R.platform.guideMismatch) { const g = R.platform.guideMismatch; warn.push("Brewer's Friend trae dos desgloses de agua que no coinciden: 'Mash Guidelines' (" + g.strike.toFixed(1) + ' L de empaste y ' + (ok(g.sparge) ? g.sparge.toFixed(1) : '?') + ' L de lavado) y \'Quick Water Requirements\' (' + g.reqStrike.toFixed(1) + ' L y ' + (ok(g.reqSparge) ? g.reqSparge.toFixed(1) : '?') + ' L). La ficha usa Quick Water Requirements, que cuadra con el volumen de hervor. Confirmar con el cervecero.'); }
+  R.platform.filter(x => typeof x === 'string').forEach(msg => {
+    let t = msg;
+    const cp = /capacity \((\d+(?:\.\d+)?) gal/i.exec(msg), cL = cp ? ' (' + fnum1(volL(N(cp[1]), 'gal')) + ' L)' : '';
+    if (/kettle capacity/i.test(msg)) t = "Brewer's Friend avisa que el volumen requerido excede la capacidad de olla de su perfil de equipo" + cL + '.';
+    else if (/mash tun capacity/i.test(msg)) t = "Brewer's Friend avisa que se excede la capacidad del macerador de su perfil de equipo" + cL + '.';
+    else if (/batch size/i.test(msg)) t = "Brewer's Friend avisa: 'Exceeded batch size - reduce boil size' (el volumen de hervor excede el tamaño de lote del perfil de equipo).";
+    warn.push(t + (R.platform.systemDefault ? ' Es el perfil de equipo por defecto de la plataforma, no su equipo real: comparar con la capacidad real de sus ollas.' : ''));
+  });
+  if (!W.biab && ok(W.strike) && ok(W.sparge) && W.strike > 0 && W.sparge > W.strike * 1.1) warn.push('Aviso informativo: el lavado (' + W.sparge.toFixed(1) + ' L) es ' + (W.sparge / W.strike).toFixed(1) + ' veces el agua de empaste (' + W.strike.toFixed(1) + ' L); la regla tradicional usa un volumen similar (referencia, no límite). Si el mosto que sale llega a 1.008 SG o pH 5.8, cortar y mandar el agua restante directo a la olla (3.1). El cervecero revisa después.');
+  R.notes.forEach(n => warn.push(n));
+  if (R.imperial) warn.push('La receta está en unidades imperiales (gal, lb, oz, °F). La ficha las muestra convertidas a métrico (1 gal = 3.785 L; 1 lb = 453.6 g; 1 oz = 28.35 g).');
+  if (R.hops.some(h => h.kind === 'whirlpool' && h.time === 0)) warn.push('Hay lúpulo de whirlpool a 0 min: en la ficha se agrega al apagar el fuego o al bajar a la temperatura indicada, según el cervecero.');
+  if (W.biab) warn.push('Receta BIAB: no hay lavado; todo el agua entra en el macerado y los tres números se reducen a uno.');
+  R.hops.filter(h => h.trunc).length && warn.push('El alfa de algún lúpulo salió recortado en el PDF (por ejemplo "37.5…").');
+  return A;
+}
+
+/* ====================== 4. CONTENIDO DE LA FICHA ====================== */
+
+const FIELD = '@F', FIELDM = '@FM', CHECK = '@C', TIME = '@T', TIME2 = '@TT';
+const fnum = (x, d) => trim0(round(x, d).toFixed(d));
+const fL = x => fnum(x, 1) + ' L';
+const fkg = x => fnum(x, 2) + ' kg';
+const fg_ = x => fnum(x, x >= 100 ? 0 : 1) + ' g';
+const fC = x => fnum(x, 1) + ' °C';
+const fSG = x => x.toFixed(3);
+const fpct = x => fnum(x, 1) + ' %';
+const plato = sg => 259 - 259 / sg;
+const sgOfP = p => 1 + p / (258.6 - (p / 258.2) * 227.1);
+const SALT_ES = { 'calcium chloride': 'Cloruro de calcio (CaCl2)', 'gypsum': 'Yeso (sulfato de calcio)', 'gypsum (calcium sulfate)': 'Yeso (sulfato de calcio)', 'epsom salt (mgso4)': 'Sal de Epsom (MgSO4)', 'epsom salt': 'Sal de Epsom (MgSO4)', 'salt': 'Sal común (NaCl)',
+  'baking soda (nahco3)': 'Bicarbonato de sodio (NaHCO3)', 'calcium chloride (cacl2)': 'Cloruro de calcio (CaCl2)', 'chalk (caco3)': 'Tiza (carbonato de calcio)', 'gypsum (caso4)': 'Yeso (sulfato de calcio)' };
+const saltEs = n => SALT_ES[n.toLowerCase().trim()] || n;
+const stageOrder = { 'Empaste': 0, 'Lavado': 1, 'Hervor': 2 };
+
+const MISC_ES = [[/phosphoric acid/i, 'Ácido fosfórico'], [/lactic acid/i, 'Ácido láctico'], [/citric acid/i, 'Ácido cítrico'], [/sulfuric acid/i, 'Ácido sulfúrico'], [/hydrochloric acid/i, 'Ácido clorhídrico'], [/acidulated malt/i, 'Malta acidulada'], [/irish moss/i, 'Irish moss'], [/whirlfloc/i, 'Whirlfloc']];
+const miscEs = n => { for (const [re, es] of MISC_ES) if (re.test(n)) return n.replace(re, es); return n; };
+function classifyMisc(m) {
+  const n = m.name;
+  if (/acid/i.test(n)) return 'acid';
+  if (/irish moss|whirlfloc|protafloc|clarif|kettle fining|isinglass|gelatin|biofine|polyclar|finings?/i.test(n)) return 'fining';
+  if (/nutrient|goferm|fermaid|dap\b|go-ferm|yeast energizer/i.test(n)) return 'nutrient';
+  return m.kind || 'other';
+}
+
+// Receta en blanco: la misma estructura con marcas {{...}}
+function blankRecipe() {
+  const R = newR('blank'); R._blank = true;
+  R.grains = [1, 2, 3].map(i => ({ name: '{{grano ' + i + '}}', kg: NaN }));
+  R.salts = [{ name: '{{sal}}', g: NaN, stage: 'Empaste' }, { name: '{{sal}}', g: NaN, stage: 'Lavado' }];
+  R.hops = [{ name: '{{lúpulo}}', alpha: NaN, g: NaN, kind: 'boil', time: NaN, temp: NaN }, { name: '{{lúpulo}}', alpha: NaN, g: NaN, kind: 'whirlpool', time: NaN, temp: NaN }, { name: '{{lúpulo}}', alpha: NaN, g: NaN, kind: 'dry', time: NaN, temp: NaN }];
+  R.yeast = [{ name: '{{cepa}}', amt: '{{cantidad}}' }]; R.mash = [{ name: '', tempC: NaN, min: NaN }]; R.ferm = [{ kind: 'primary', days: NaN, tempC: NaN }];
+  R.misc = [{ name: '{{clarificante}}', amt: '{{cantidad}}', stage: 'Hervor', time: NaN, kind: 'fining' }];
+  return R;
+}
+
+function buildSpec(R, A) {
+  A = A || analyze(R);
+  const bl = !!R._blank, W = A.water;
+  const P = l => '{{' + l + '}}';
+  const sh = (x, f, l) => bl ? P(l) : (ok(x) ? f(x) : SD);          // dato numérico
+  const shS = (s, l) => bl ? P(l) : (s && String(s).trim() ? String(s) : SD);
+  const S = [];
+  const isLager = R.type === 'lager', isAle = R.type === 'ale';
+  const typeTxt = isLager ? 'Lager' : isAle ? 'Ale' : (bl ? P('ale o lager') : 'Sin dato (ale o lager)');
+  const boilMin = R.boilMin;
+  const kg = W.grainKg;
+
+  /* ---------- lúpulos ordenados en el tiempo y envases ---------- */
+  const rank = h => h.kind === 'fwh' ? -1 : h.kind === 'boil' ? 1000 - (ok(h.time) ? h.time : 0) : h.kind === 'whirlpool' ? 2000 + (ok(h.time) ? -h.time : 0) : h.kind === 'dry' ? 3000 : 4000;
+  const hops = R.hops.map((h, i) => ({ h, i })).sort((a, b) => rank(a.h) - rank(b.h) || a.i - b.i).map((o, n) => Object.assign({}, o.h, { id: 'H' + (n + 1) }));
+  const hopLabel = h => h.name + (ok(h.alpha) ? ' (' + fnum(h.alpha, 1) + ' % AA)' : '');
+  const hopWhen = h => {
+    if (h.kind === 'fwh') return 'Primer mosto: al recolectar el mosto, antes de hervir';
+    if (h.kind === 'boil') return !ok(h.time) ? (bl ? P('minuto') : SD) : (ok(boilMin) && h.time >= boilMin ? 'Minuto ' + fnum(h.time, 0) + ': al romper el hervor' : 'Faltan ' + fnum(h.time, 0) + ' min para terminar el hervor');
+    if (h.kind === 'whirlpool') return 'Whirlpool/hopstand' + (ok(h.time) ? ' ' + fnum(h.time, 0) + ' min' : '') + (ok(h.temp) ? ' a ' + fC(h.temp) : '');
+    if (h.kind === 'dry') return 'Dry hop' + (ok(h.time) ? ', ' + fnum(h.time, 1) + ' días de contacto' : '');
+    return 'Según la receta';
+  };
+  const miscs = R.misc.map(m => Object.assign({}, m, { name: miscEs(m.name), kind: classifyMisc(m) }));
+  const acids = miscs.filter(m => m.kind === 'acid'), fin = miscs.filter(m => m.kind === 'fining'), nut = miscs.filter(m => m.kind === 'nutrient');
+  const otherM = miscs.filter(m => !['acid', 'fining', 'nutrient'].includes(m.kind));
+  const salts = R.salts.slice().sort((a, b) => (stageOrder[a.stage] ?? 9) - (stageOrder[b.stage] ?? 9));
+  const mashSteps = R.mash.filter(s => !s.out), mashOut = R.mash.filter(s => s.out);
+  const sugars = R.grains.filter(g => g.boilMin);
+
+  /* ====== ENCABEZADO ====== */
+  S.push({ t: 'header', title: 'BITÁCORA DE PRODUCCIÓN CERVECERA', subtitle: 'Ficha de Lote Estandarizada — Proceso Estructurado de Cocinado' });
+
+  /* ====== 1 ====== */
+  S.push({ t: 'section', title: '1. DATOS DEL LOTE' });
+  S.push({ t: 'kv', rows: [
+    ['ID / Lote:', FIELD, 'Receta / Estilo:', shS(R.name, 'nombre de la receta') + (R.style ? ' · ' + R.style : '')],
+    ['Fecha de cocinado:', FIELD, 'Tipo / Método:', typeTxt + (R.biab ? ' · BIAB' : R.method && !bl ? ' · ' + R.method : '')],
+    ['Responsable:', FIELD, 'Equipo / Fermentador:', shS(R.equipment, 'equipo')],
+    ['Cervecero de la ficha:', R.brewer ? cap(R.brewer) : FIELD, 'Vol. previsto en fermentador:', sh(R.batchL, fL, 'volumen del lote')]
+  ] });
+  S.push({ t: 'table', noHead: true, cols: [{ w: 21, k: 'label' }, { w: 12, k: 'prev' }, { w: 21, k: 'label' }, { w: 12, k: 'prev' }, { w: 21, k: 'label' }, { w: 13, k: 'prev' }],
+    rows: [
+      ['Densidad inicial (OG)', sh(R.og, fSG, 'OG'), 'Densidad final (FG)', sh(R.fg, fSG, 'FG'), 'Alcohol previsto (ABV)', ok(R.abv) ? fpct(R.abv) : ok(R.og) && ok(R.fg) ? fpct((R.og - R.fg) * 131.25) : sh(NaN, fpct, 'ABV')],
+      ['Amargor (IBU)', sh(R.ibu, x => fnum(x, 1), 'IBU'), 'Tiempo de hervor', sh(boilMin, x => fnum(x, 0) + ' min', 'min'), 'Vol. envasado previsto', sh(R.finalL, fL, 'volumen envasado')]
+    ] });
+  if (!bl && A.warn.length) {
+    S.push({ t: 'warn', title: 'AVISOS DE LA LECTURA DE LA RECETA: revisar con el cervecero antes de empezar', items: A.warn });
+  }
+  S.push({ t: 'note', text: 'Azul: previsto por la receta (no se escribe encima). Amarillo: lo real que anota el operador. Verde «Ref.»: referencia general de la base de conocimiento, no es de la receta. Semáforo: verde = registrar; amarillo = reversible, tomar la acción segura y anotar (va al reporte); rojo = seguridad, contaminación o irreversible: detener y avisar al cervecero. Casilla sin marcar al cambiar de sección = desviación amarilla (roja si es de limpieza o seguridad).' });
+
+  /* ====== 2 ====== */
+  S.push({ t: 'section', title: '2. PESAJES Y PREPARACIÓN (ANTES DE ENCENDER NADA)' });
+  S.push({ t: 'note', text: 'Pese, mida y rotule TODO antes de encender (maltas, sales por etapa, ácido, cada lúpulo, clarificante, nutriente y levadura): con el mosto en marcha no hay tiempo de pesar una adición a su minuto.' });
+  S.push({ t: 'checks', items: [
+    'Equipo limpio y sanitizado, enjuague verificado (si falta: ROJO, no iniciar)',
+    'EPP puesto para manejar químicos (careta, gafas, guantes largos, delantal, botas)',
+    'pH-metro (buffers 4.01 y 7.00), termómetro y densímetro/refractómetro calibrados',
+    'Molino ajustado (Ref.: brecha 1.1–1.3 mm, salvo que el cervecero indique otra)',
+    'Agua en el depósito (total de la sección 3); gas y electricidad verificados',
+    'Levadura verificada: cepa, cantidad y fecha de caducidad'
+  ] });
+  // 2.1 maltas
+  const mashGrains = R.grains.filter(g => !g.boilMin);
+  const gTot = bl ? P('suma de los granos') : (mashGrains.length && mashGrains.every(g => ok(g.kg)) ? fkg(kg) : SD);
+  const gRows = R.grains.length ? R.grains.map(g => [CHECK, g.name, sh(g.kg, fkg, 'cantidad'), FIELD, g.boilMin ? 'No se muele: va al hervor, minuto ' + fnum(g.boilMin, 0) + ' (ver sección 6)' : ok(g.kg) && kg > 0 ? fnum(g.kg / kg * 100, 1) + ' % del grano' : '']) : [[CHECK, SD, SD, FIELD, '']];
+  S.push({ t: 'table', cols: [{ l: 'OK', w: 6, k: 'ok' }, { l: '2.1 Maltas y granos', w: 30, k: 'label' }, { l: 'Previsto (ficha)', w: 15, k: 'prev' }, { l: 'Real pesado', w: 15, k: 'real' }, { l: 'Notas', w: 35, k: 'text' }],
+    rows: gRows.concat([['', 'TOTAL DE MALTA Y GRANO (a macerar)', gTot, FIELD, 'Molienda sana, con poca harina: [ ]']]) });
+  // 2.4 clarificante, nutriente, levadura
+  const oRows = [];
+  fin.forEach(m => oRows.push([CHECK, 'Clarificante: ' + m.name, m.amt, FIELD, ok(m.time) ? 'Faltan ' + fnum(m.time, 0) + ' min del hervor' : 'Rotular "10–15 min antes del final del hervor"']));
+  nut.forEach(m => oRows.push([CHECK, 'Nutriente: ' + m.name, m.amt, FIELD, m.stage === 'Hidratación' ? 'Con el agua de hidratación' : 'Rotular "10–15 min antes del final del hervor"']));
+  if (!fin.length && !nut.length) oRows.push([CHECK, 'Clarificante y nutriente de levadura', bl ? P('si la receta los trae') : SD, FIELD, 'Si la receta los trae: rotular "10–15 min antes del final del hervor"']);
+  sugars.forEach(g => oRows.push([CHECK, 'Azúcar/adjunto al hervor: ' + g.name, sh(g.kg, fkg, 'cantidad'), FIELD, 'Minuto ' + fnum(g.boilMin, 0) + ' del hervor; rotulado']));
+  otherM.forEach(m => oRows.push([CHECK, m.name + ' (' + (m.stage || '').toLowerCase() + ')', m.amt, FIELD, ok(m.time) ? 'Minuto ' + fnum(m.time, 0) : '']));
+  const yeastTxt = R.yeast.length ? R.yeast.map(y => y.name + (y.amt ? ' (' + y.amt + ')' : '')).join('; ') : (bl ? P('cepa y cantidad') : SD);
+  oRows.push([CHECK, 'Levadura', yeastTxt + (R.yeast[0] && R.yeast[0].cells ? ' · ' + R.yeast[0].cells : ''), FIELD, 'Lote y caducidad: ___']);
+  // 2.2 sales, ácido y otros
+  const sRows = [];
+  salts.forEach(s => sRows.push([CHECK, saltEs(s.name) + ' · ' + s.stage.toUpperCase(), sh(s.g, fg_, 'g'), FIELD, 'Recipiente rotulado: ' + s.stage.toLowerCase()]));
+  acids.forEach(a => sRows.push([CHECK, a.name + ' · ' + (a.stage || '').toUpperCase(), a.amt, FIELD, 'Medido aparte y rotulado']));
+  if (!sRows.length) sRows.push([CHECK, bl ? P('sal o ácido') : 'La receta no trae sales ni ácido', bl ? P('g') : '—', FIELD, bl ? '' : 'Agua sola en todas las etapas; medir y anotar el pH. Ref.: pH de macerado 5.2–5.6']);
+  const skey = st => /emp|mash/i.test(st || '') ? 0 : /lav|spar/i.test(st || '') ? 1 : /herv|boil/i.test(st || '') ? 2 : -1;
+  const sitems = salts.map(x => ({ n: saltEs(x.name), st: skey(x.stage), v: sh(x.g, fg_, 'g') })).concat(acids.map(a => ({ n: a.name, st: skey(a.stage), v: a.amt })));
+  if (!bl && sitems.length >= 4 && sitems.every(x => x.st >= 0)) {
+    const used = [0, 1, 2].filter(k => sitems.some(x => x.st === k)), snames = [...new Set(sitems.map(x => x.n))], sn = ['Empaste', 'Lavado', 'Hervor'];
+    const scols = [{ l: 'OK', w: 6, k: 'ok' }, { l: '2.2 Sales y ácido, por etapa', w: 34, k: 'label' }];
+    used.forEach(k => { scols.push({ l: sn[k] + ': previsto', w: 15, k: 'prev' }); scols.push({ l: sn[k] + ': real', w: 15, k: 'real' }); });
+    S.push({ t: 'table', cols: scols, rows: snames.map(n => { const r = [CHECK, n]; used.forEach(k => { const it = sitems.find(x => x.n === n && x.st === k); r.push(it ? it.v : ''); r.push(it ? FIELD : ''); }); return r; }) });
+    S.push({ t: 'note', text: 'Cada sal en su recipiente rotulado con la etapa. Celda vacía: esa etapa no lleva esa sal.' });
+    S.push({ t: 'table', cols: [{ l: 'OK', w: 5, k: 'ok' }, { l: '2.4 Clarificante, nutriente y levadura', w: 31, k: 'label' }, { l: 'Previsto (ficha)', w: 19, k: 'prev' }, { l: 'Real pesado', w: 14, k: 'real' }, { l: 'Notas', w: 31, k: 'text' }], rows: oRows });
+  } else
+  S.push({ t: 'table', cols: [{ l: 'OK', w: 5, k: 'ok' }, { l: '2.2 Sales, ácido y otros insumos', w: 31, k: 'label' }, { l: 'Previsto (ficha)', w: 19, k: 'prev' }, { l: 'Real pesado', w: 14, k: 'real' }, { l: 'Notas', w: 31, k: 'text' }], rows: sRows.concat(oRows) });
+  if (!bl && R.salts.length && !R.salts.some(s => s.stage === 'Lavado') && !R.biab) S.push({ t: 'note', text: 'La receta no trae sales para el lavado: esa etapa va con agua sola y se anota.' });
+  // 2.3 lúpulos
+  const hRows = hops.map(h => [CHECK, h.id, hopLabel(h), sh(h.g, fg_, 'cantidad'), FIELD, hopWhen(h)]);
+  S.push({ t: 'note', text: 'Un recipiente por adición de lúpulo (también el dry hop, que se guarda frío y cerrado), rotulado con variedad, gramos y minuto, en el orden de uso. Si falta el lúpulo de amargor o un ingrediente base: ROJO, no sustituir y avisar.' });
+  S.push({ t: 'table', cols: [{ l: 'OK', w: 6, k: 'ok' }, { l: '2.3 Envase', w: 8, k: 'label' }, { l: 'Lúpulo por adición', w: 28, k: 'label' }, { l: 'Previsto (g)', w: 13, k: 'prev' }, { l: 'Real pesado', w: 14, k: 'real' }, { l: 'Momento de adición', w: 31, k: 'text' }],
+    rows: hRows.length ? hRows : [[CHECK, '—', SD, SD, FIELD, '']] });
+
+  /* ====== 3 AGUA ====== */
+  S.push({ t: 'section', title: '3. AGUA: VOLUMEN A ALCANZAR, NO A AGREGAR' });
+  S.push({ t: 'note', text: 'Tres números por etapa: AGREGAR AHORA (lo que se mide y echa en este paso), ACUMULADO (toda el agua agregada al lote) y ESPERADO EN LA OLLA (ya descontado lo que retiene el grano). El volumen del lavado y del hervor nunca se suma de nuevo: solo la diferencia hasta el acumulado.' });
+  const wr = [];
+  if (bl) {
+    wr.push(['Empaste (macerador)', P('L'), P('L'), '— (queda con el grano)', FIELD, FIELD]);
+    wr.push(['Lavado (hasta el acumulado)', P('L'), P('L'), P('L pre-hervor'), FIELD, FIELD]);
+    wr.push(['Agua directa a la olla o ajuste al volumen de hervor', P('L'), P('L'), P('L pre-hervor'), FIELD, FIELD]);
+  } else if (W.biab) {
+    wr.push(['Agua BIAB (todo en el macerado)', sh(W.strike, fL, 'agua'), sh(W.strike, fL, 'agua'), ok(W.boil) ? fL(W.boil) + ' antes del hervor' : SD, FIELD, FIELD]);
+  } else {
+    wr.push(['Empaste (macerador)', sh(W.strike, fL, 'agua'), sh(W.strike, fL, 'agua'), '— (queda con el grano)', FIELD, FIELD]);
+    wr.push(['Lavado: agregar solo hasta el acumulado', sh(W.sparge, fL, 'agua'), sh(W.cum, fL, 'agua'), ok(W.boil) ? fL(W.boil) + ' antes del hervor' : SD, FIELD, FIELD]);
+    wr.push(['Agua directa a la olla o ajuste al volumen de hervor', ok(W.cum) && ok(W.boil) ? '0 L según la receta' : SD, ok(W.cum) ? fL(W.cum) + ' + lo que se agregue' : SD, ok(W.boil) ? fL(W.boil) : SD, FIELD, FIELD]);
+  }
+  wr.push(['TOTAL de agua del lote', ok(W.cum) ? fL(W.cum) : sh(W.total, fL, 'agua'), ok(W.total) ? 'Receta: ' + fL(W.total) : '—', '', FIELD, '']);
+  S.push({ t: 'table', cols: [{ l: '3.1 Etapa', w: 25, k: 'label' }, { l: 'Agregar ahora (previsto)', w: 17, k: 'prev' }, { l: 'Acumulado (previsto)', w: 16, k: 'prev' }, { l: 'Esperado en la olla', w: 16, k: 'prev' }, { l: 'Real agregado', w: 13, k: 'real' }, { l: 'Real en la olla', w: 13, k: 'real' }], rows: wr });
+  if (!bl) {
+    S.push({ t: 'note', text: 'Agua directa a la olla: si se corta el lavado antes de gastar toda el agua (sección 5), lo que no se use de los ' + (ok(W.sparge) ? fL(W.sparge) : 'litros de lavado') + ' va aquí. Si al terminar el lavado faltan litros, agregar solo la diferencia.' });
+    if (W.missing) S.push({ t: 'note', text: 'Ref.: la receta no trae volumen de empaste. Con la relación agua/grano de 2.7–3.5 L por kg' + (kg > 0 ? ' serían ' + fnum(kg * 2.7, 1) + ' a ' + fnum(kg * 3.5, 1) + ' L para ' + fnum(kg, 2) + ' kg de grano' : '') + '; es solo una referencia: el volumen lo define el cervecero.' });
+    if (ok(W.retention) && W.retention >= 0 && kg > 0) S.push({ t: 'note', text: 'Retención implícita en la receta: ' + fL(W.retention) + ' (' + fnum(W.perKg, 2) + ' L por kg de grano; incluye pérdidas del equipo). Ref.: el grano retiene 0.8–1.0 L por kg' + (ok(W.ratio) && !W.biab ? '; relación agua/grano de empaste ' + fnum(W.ratio, 2) + ' L por kg (ref. 2.7–3.5)' : '') + '. Manda la receta; los rangos no la corrigen.' });
+    if (R.waterIons) { const w = R.waterIons; S.push({ t: 'note', text: 'Perfil de agua objetivo de la receta (ppm): Ca ' + w.Ca + ' · Mg ' + w.Mg + ' · Na ' + w.Na + ' · Cl ' + w.Cl + ' · SO4 ' + w.SO4 + (ok(w.HCO3) ? ' · HCO3 ' + w.HCO3 : '') + (ok(R.mashPH) ? '. pH de macerado previsto: ' + fnum(R.mashPH, 2) : '') + '.' }); }
+  }
+  S.push({ t: 'checks', items: ['Agregar nunca es cero ni negativo; si lo es, revisar el paso anterior (AMARILLO)', 'El acumulado cabe con margen de espuma (si no: ROJO). Agua de más: AMARILLO, anotar litros'] });
+
+  /* ====== 4 MACERADO ====== */
+  S.push({ t: 'section', title: '4. MACERADO' });
+  const strikeRef = (() => {
+    if (ok(R.strikeC) || !mashSteps.length || !ok(mashSteps[0].tempC) || !ok(W.strike) || !(kg > 0)) return '';
+    const tg = ok(R.grainTempC) ? R.grainTempC : 20, tm = mashSteps[0].tempC, v = tm + 0.41 * (kg / W.strike) * (tm - tg);
+    return 'Ref.: T = Tm + 0.41 × (kg grano ÷ L agua) × (Tm − Tgrano) ≈ ' + fC(v) + ' con grano a ' + fnum(tg, 0) + ' °C';
+  })();
+  const m41 = [
+    ['Agua de empaste (agregar ahora)', W.biab || !bl ? sh(W.strike, fL, 'agua') : P('L'), FIELD, TIME2, 'Sales [ ] y ácido [ ] añadidos; grano sin grumos secos, olla tapada'],
+    ['Temperatura del agua de empaste', sh(R.strikeC, fC, 'temperatura'), FIELD, TIME, strikeRef || 'Anotar la temperatura real']
+  ];
+  const stepsOut = mashSteps.length ? mashSteps : (bl ? R.mash : []);
+  if (stepsOut.length) stepsOut.forEach((s, i) => m41.push(['Temperatura de macerado' + (stepsOut.length > 1 ? ' (paso ' + (i + 1) + ')' : ''), ok(s.tempC) || !bl ? fC(s.tempC) + ' · ' + fnum(s.min, 0) + ' min' : P('temperatura') + ' · ' + P('min'), FIELD, TIME2, i === 0 ? 'Ref.: β 60–65 °C · α 68–72 °C' : '']));
+  else m41.push(['Temperatura de macerado', SD, FIELD, TIME2, 'Ref.: β 60–65 °C (más fermentable) · α 68–72 °C (más dulce)']);
+  m41.push(['pH del macerado (muestra enfriada a 20 °C)', ok(R.mashPH) ? fnum(R.mashPH, 2) : '—', FIELD, TIME, 'Ref.: 5.2–5.6 a 20 °C; una muestra caliente lee ~0.30 menos']);
+  m41.push(['Prueba de yodo al terminar el tiempo', '—', '[ ] Sin almidón   [ ] Con almidón', TIME, 'Ref.: ámbar = conversión completa; azul o negro = extender 15 min y repetir']);
+  mashOut.forEach(s => m41.push(['Mash-out', fC(s.tempC) + ' · ' + fnum(s.min, 0) + ' min', FIELD, TIME2, 'Ref.: 75–78 °C']));
+  if (!mashOut.length) m41.push(['Mash-out (si la receta lo trae)', bl ? P('temperatura') : 'La receta no lo indica', FIELD, TIME2, 'Ref.: 75–78 °C']);
+  S.push({ t: 'table', card: true, title: '4.1 Empaste y macerado', right: { label: 'Verificación de inicio:', check: true },
+    cols: [{ l: 'Parámetro', w: 22, k: 'label' }, { l: 'Previsto (ficha)', w: 15, k: 'prev' }, { l: 'Real medido', w: 15, k: 'real' }, { l: 'Hora inicio / fin', w: 14, k: 'text' }, { l: 'Notas de control', w: 34, k: 'text' }], rows: m41 });
+
+  /* ====== 5 LAVADO ====== */
+  S.push({ t: 'section', title: '5. RECIRCULADO Y LAVADO' });
+  if (W.biab && !bl) {
+    S.push({ t: 'note', text: 'Receta BIAB: no hay lavado. Al terminar el macerado se levanta la bolsa y se escurre; se mide el volumen y la densidad antes del hervor.' });
+  }
+  const l51 = W.biab && !bl ? [] : [['Recirculado (vorlauf) hasta que el mosto salga claro', '—', CHECK, TIME, 'Despacio; un mosto turbio al inicio es normal']];
+  if (!W.biab || bl) {
+    l51.push(['Agua de lavado: AGREGAR AHORA', sh(W.sparge, fL, 'agua'), FIELD, 'Duración: ___ min', 'Es lo que se agrega, no el acumulado. Sales de lavado [ ] y ácido [ ]']);
+    l51.push(['Temperatura del agua de lavado', sh(R.spargeC, fC, 'temperatura'), FIELD, TIME, 'Ref.: 75–77 °C (77–80 °C: amarillo)']);
+    l51.push(['Densidad del mosto que sale', '—', FIELD, TIME, 'Ref.: cortar a 1.008 SG (2.0 °P) o pH 5.8, lo que ocurra primero; seguir después: AMARILLO (taninos). El agua sin usar va directo a la olla (3.1)']);
+    l51.push(['pH del mosto que sale', '—', FIELD, TIME, 'Ref.: cortar al llegar a 5.8']);
+  }
+  l51.push(['Volumen recolectado antes del hervor', sh(R.boilL, fL, 'volumen'), FIELD, TIME, 'Si faltan litros: agregar solo la diferencia (sección 3)']);
+  l51.push(['Densidad antes del hervor (SG)', sh(R.preSG, fSG, 'SG'), FIELD, TIME, 'Brix corregido: ___']);
+  S.push({ t: 'table', card: true, title: '5.1 Recirculado, lavado y mosto pre-hervor', right: { label: 'Verificación completa:', check: true },
+    cols: [{ l: 'Parámetro', w: 22, k: 'label' }, { l: 'Previsto (ficha)', w: 15, k: 'prev' }, { l: 'Real medido', w: 15, k: 'real' }, { l: 'Hora / tiempos', w: 14, k: 'text' }, { l: 'Notas / desvíos', w: 34, k: 'text' }], rows: l51 });
+
+  /* ====== 6 HERVOR ====== */
+  S.push({ t: 'section', title: '6. HERVOR Y LÚPULOS' });
+  const adds = [];   // {t, txt}
+  hops.filter(h => h.kind === 'boil' || h.kind === 'fwh').forEach(h => adds.push({ t: h.kind === 'fwh' ? (ok(boilMin) ? boilMin + 1 : 999) : h.time, txt: h.id + ' ' + h.name + ' ' + (ok(h.g) ? fg_(h.g) : (bl ? P('g') : SD)) }));
+  fin.concat(nut).filter(m => ok(m.time)).forEach(m => adds.push({ t: m.time, txt: m.name + ' ' + m.amt }));
+  sugars.forEach(g => adds.push({ t: g.boilMin, txt: g.name + ' ' + fkg(g.kg) }));
+  otherM.filter(m => ok(m.time) && /boil/i.test(m.stage || 'hervor')).forEach(m => adds.push({ t: m.time, txt: m.name + ' ' + m.amt }));
+  adds.sort((a, b) => b.t - a.t);
+  const hr = [];
+  const early = adds.filter(a => ok(boilMin) && a.t > boilMin);
+  if (early.length) hr.push(['Antes de hervir', early.map(a => a.txt).join(' + '), TIME, FIELD, CHECK]);
+  const atStart = adds.filter(a => ok(boilMin) && a.t === boilMin).map(a => a.txt);
+  hr.push(['Inicio del hervor' + (ok(boilMin) ? ' (' + fnum(boilMin, 0) + ' min)' : ''), ['Rompe el hervor; olla destapada'].concat(atStart).join(' + '), TIME, FIELD, CHECK]);
+  [...new Set(adds.filter(a => ok(boilMin) ? a.t < boilMin && a.t > 0 : a.t > 0).map(a => a.t))].forEach(t => hr.push(['Faltan ' + fnum(t, 0) + ' min', adds.filter(a => a.t === t).map(a => a.txt).join(' + '), TIME, FIELD, CHECK]));
+  if (!fin.some(m => ok(m.time)) && !nut.some(m => ok(m.time))) hr.push(['Faltan 10–15 min', 'Clarificante y nutriente (si la receta los trae). Ref.: 10–15 min antes del final', TIME, FIELD, CHECK]);
+  const zero = adds.filter(a => a.t === 0).map(a => a.txt);
+  hr.push(['Fin del hervor (0 min)', ['Apagar el fuego'].concat(zero).join(' + '), TIME, FIELD, CHECK]);
+  const wp = hops.filter(h => h.kind === 'whirlpool');
+  if (wp.length) {
+    const groups = {}; wp.forEach(h => { const k = (ok(h.time) ? h.time : '?') + '|' + (ok(h.temp) ? round(h.temp, 0) : '?'); (groups[k] = groups[k] || []).push(h); });
+    Object.keys(groups).forEach(k => { const g = groups[k], h0 = g[0]; hr.push(['Whirlpool / hopstand' + (ok(h0.time) ? ' ' + fnum(h0.time, 0) + ' min' : '') + (ok(h0.temp) ? ' a ' + fC(h0.temp) : ''), g.map(h => h.id + ' ' + h.name + ' ' + fg_(h.g)).join(' + ') + '. Ref.: hopstand 70–85 °C por 15–30 min', TIME, FIELD, CHECK]); });
+  } else hr.push(['Whirlpool', 'Movimiento tangencial para juntar el trub en el centro', TIME, FIELD, CHECK]);
+  S.push({ t: 'table', card: true, title: '6.1 Control de hervor y adiciones', right: { text: 'Tiempo total: ' + (ok(boilMin) ? fnum(boilMin, 0) + ' min' : (bl ? P('min') : SD)) },
+    cols: [{ l: 'Tiempo / hito', w: 22, k: 'label' }, { l: 'Adición / acción prevista (envase)', w: 38, k: 'text' }, { l: 'Hora programada', w: 14, k: 'text' }, { l: 'Hora real', w: 17, k: 'real' }, { l: 'OK', w: 9, k: 'ok' }], rows: hr });
+  S.push({ t: 'table', card: true, title: '6.2 Mosto después del hervor',
+    cols: [{ l: 'Parámetro', w: 26, k: 'label' }, { l: 'Previsto (ficha)', w: 18, k: 'prev' }, { l: 'Real medido', w: 16, k: 'real' }, { l: 'Notas', w: 40, k: 'text' }],
+    rows: [['Volumen en la olla tras el hervor', sh(R.postBoilL, fL, 'volumen'), FIELD, 'Con varilla o visor'], ['Densidad después del hervor (SG)', sh(R.postSG, fSG, 'SG'), FIELD, 'Anotar'],
+      ['Evaporación real (% por hora)', '—', FIELD, 'Ref.: 8–10 % por hora o más. (Vol. pre − Vol. post) ÷ Vol. pre ÷ horas × 100']] });
+  S.push({ t: 'checks', items: ['Cada lúpulo se marcó en el momento de agregarlo, no después', 'Enfriador de placas/serpentín sanitizado y conectado'] });
+
+  /* ====== 7 ENFRIAMIENTO ====== */
+  S.push({ t: 'section', title: '7. ENFRIAMIENTO E INOCULACIÓN (DÍA 0)' });
+  const fermT = R.ferm.length && ok(R.ferm[0].tempC) ? R.ferm[0].tempC : NaN;
+  const coolRef = isLager ? 'Ref.: lager 9–12 °C' : isAle ? 'Ref.: ale 18–20 °C' : 'Ref.: ale 18–20 °C; lager 9–12 °C';
+  const ogP = ok(R.og) ? plato(R.og) : NaN;
+  const o2Ref = ok(ogP) ? 'Ref.: ' + (ogP < 16 ? '8–12 ppm (mosto de ' + fnum(ogP, 1) + ' °P)' : '12–15 ppm (mosto de ' + fnum(ogP, 1) + ' °P)') : 'Ref.: 8–12 ppm (<16 °P) o 12–15 ppm (>16 °P)';
+  const topOff = ok(R.topOffL) ? fL(R.topOffL) + ' según la receta; solo si faltan litros, agregar la diferencia hasta ' + (ok(R.batchL) ? fL(R.batchL) : '—') : (ok(R.batchL) ? 'Solo si faltan litros: agregar la diferencia hasta ' + fL(R.batchL) : (bl ? P('si aplica') : SD));
+  const topOffS = ok(R.topOffL) ? 'Agua en el fermentador según la receta: ' + fL(R.topOffL) + '; solo si faltan litros, agregar la diferencia. Agregado: ___ L' : 'Solo si faltan litros: agregar la diferencia (anotar: ___ L)';
+  const hydS = ok(R.hydrate) || (typeof R.hydrate === 'string' && R.hydrate) ? 'Hidratación: ' + R.hydrate : 'Hidratación: ref. seca, en agua tibia a 35–40 °C (o lo que diga la etiqueta); nunca en el mosto';
+  const i71 = [
+    ['Temperatura del mosto enfriado', sh(fermT, fC, 'temperatura'), FIELD, coolRef + '. No inocular arriba de ~27 °C'],
+    ['Oxigenación / aireación', bl ? P('si aplica') : SD, FIELD, o2Ref + '. Presión / tiempo: ___'],
+    ['Volumen en el fermentador', sh(R.batchL, fL, 'volumen'), FIELD, topOffS],
+    ['Densidad inicial (OG)', sh(R.og, fSG, 'OG'), FIELD, 'Anotar ANTES de sembrar; base del ABV'],
+    ['Levadura (cepa y cantidad)', yeastTxt, FIELD, hydS + '. Lote: ___'],
+    ['Hora de inoculación', '—', TIME, 'Temperatura del mosto en ese momento: ___ °C. Trasvasar al fermentador antes: no sembrar en la olla (ROJO)'],
+    ['Control de temperatura del fermentador', sh(fermT, fC, 'temperatura'), CHECK, 'Fijado al valor de la ficha']
+  ];
+  S.push({ t: 'table', card: true, title: '7.1 Enfriamiento e inoculación de la levadura', right: { label: 'Verificación limpieza fermentador:', check: true },
+    cols: [{ l: 'Concepto', w: 22, k: 'label' }, { l: 'Previsto (ficha)', w: 20, k: 'prev' }, { l: 'Real medido', w: 16, k: 'real' }, { l: 'Observaciones / desvíos', w: 42, k: 'text' }], rows: i71 });
+
+  /* ====== 8 FERMENTACIÓN ====== */
+  S.push({ t: 'section', title: '8. FERMENTACIÓN' });
+  const fermRef = isLager ? 'Ref.: lager 10–13 °C' : isAle ? 'Ref.: ale 18–21 °C' : 'Ref.: ale 18–21 °C; lager 10–13 °C';
+  S.push({ t: 'note', text: 'Cada día: temperatura y densidad; revisar sello, espuma y olor. ' + fermRef + ' si la receta no trae temperatura. Fuera de la ventana: AMARILLO. Película, olor agrio, a solvente o a huevo podrido: ROJO. Días clave; si la fermentación dura más, usar la fila libre.' });
+  let totalDays = R.ferm.reduce((a, f) => a + (ok(f.days) ? f.days : 0), 0);
+  totalDays = totalDays > 0 ? Math.min(Math.ceil(totalDays), 35) : (isLager ? 21 : 14);
+  const primD = R.ferm.length > 1 && ok(R.ferm[0].days) ? Math.ceil(R.ferm[0].days) : -1;
+  const stageT = d => { let acc = 0; for (const f of R.ferm) { acc += ok(f.days) ? f.days : 0; if (d < acc || f === R.ferm[R.ferm.length - 1]) return ok(f.tempC) ? fC(f.tempC) : fermRef; } return fermRef; };
+  const drows = [];
+  const keyDays = [0, 1, 2, 3, 4, 7, 10].filter(d => d <= totalDays);
+  [primD, totalDays].forEach(d => { if (d > 0 && !keyDays.includes(d)) keyDays.push(d); });
+  keyDays.sort((a, b) => a - b);
+  for (const d of keyDays) {
+    const hint = d === 0 ? 'Inoculación y sellado' : d === totalDays ? 'Fin de la fermentación (receta)' : d === primD ? 'Fin de la primaria (receta)' : '';
+    drows.push(['D' + d, TIME, R.ferm.length ? stageT(d) : fermRef, FIELD, FIELD, FIELD, { hint }]);
+  }
+  drows.push(['D__', TIME, '', FIELD, FIELD, FIELD, { hint: 'Fila libre' }]);
+  S.push({ t: 'table', cols: [{ l: 'Día', w: 6, k: 'label' }, { l: 'Fecha / hora', w: 13, k: 'text' }, { l: 'Temp. prevista', w: 14, k: 'prev' }, { l: 'Temp. real', w: 12, k: 'real' }, { l: 'Densidad (SG)', w: 12, k: 'real' }, { l: 'Presión (PSI)', w: 10, k: 'real' }, { l: 'Acciones / observaciones', w: 33, k: 'real' }], rows: drows });
+  // diacetilo
+  let dSG = '—';
+  if (ok(R.fg)) { const fp = plato(R.fg); dSG = 'Ref.: ≈ ' + fSG(sgOfP(fp + 2)) + '–' + fSG(sgOfP(fp + 3)) + ' SG (faltan 2–3 °P para la FG)'; }
+  else dSG = 'Ref.: cuando falten 2–3 °P para la densidad final';
+  const dTemp = isLager ? 'Ref.: lager 13–21 °C; la prueba de VDK decide cuándo termina' : isAle ? 'Ref.: ale 18–21 °C por 48 h' : 'Ref.: ale 18–21 °C por 48 h; lager 13–21 °C (decide la prueba de VDK)';
+  S.push({ t: 'table', card: true, title: '8.1 Descanso de diacetilo', right: { label: 'Verificación:', check: true },
+    cols: [{ l: 'Concepto', w: 24, k: 'label' }, { l: 'Previsto (ficha)', w: 24, k: 'prev' }, { l: 'Real', w: 16, k: 'real' }, { l: 'Notas', w: 36, k: 'text' }],
+    rows: [['Inicio del descanso: densidad y temperatura', dSG, FIELD, dTemp],
+      ['Prueba de VDK', '—', '[ ] Negativa   [ ] Con mantequilla', 'Ref.: muestra a 60 °C por 20 min. Con mantequilla: extender y repetir'],
+      ['Densidad final estable (2 lecturas seguidas)', sh(R.fg, fSG, 'FG') + ' (FG estimada)', FIELD, 'No pasar al crash sin VDK negativa']] });
+
+  /* ====== 9 DRY HOP Y MADURACIÓN ====== */
+  const dry = hops.filter(h => h.kind === 'dry');
+  S.push({ t: 'section', title: dry.length || bl ? '9. DRY HOP Y MADURACIÓN' : '9. CRASH Y MADURACIÓN' });
+  if (dry.length) {
+    S.push({ t: 'table', card: true, title: '9.1 Dry hop',
+      cols: [{ l: 'Envase / insumo', w: 24, k: 'label' }, { l: 'Previsto', w: 12, k: 'prev' }, { l: 'Real', w: 11, k: 'real' }, { l: 'Fecha / hora', w: 13, k: 'real' }, { l: 'Contacto previsto', w: 13, k: 'prev' }, { l: 'Contacto real', w: 12, k: 'real' }, { l: 'Densidad posterior', w: 15, k: 'real' }],
+      rows: dry.map(h => [h.id + ' ' + hopLabel(h), sh(h.g, fg_, 'g'), FIELD, FIELD, ok(h.time) ? fnum(h.time, 1) + ' días' : SD, FIELD, FIELD]) });
+    S.push({ t: 'note', text: 'Ref.: contacto de 2 a 5 días a 14–18 °C, o lo que diga la receta. Purgar con CO₂ antes de abrir. Si la densidad baja después del dry hop (hop creep), avisar antes de envasar.' });
+  } else if (bl) S.push({ t: 'note', text: '{{Si la receta trae dry hop, aparece aquí}}' });
+  const ageTxt = ok(R.ageDays) ? fnum(R.ageDays, 0) + ' días' + (ok(R.ageC) ? ' a ' + fC(R.ageC) : '') : (bl ? P('tiempo y temperatura') : SD);
+  S.push({ t: 'table', card: true, title: (dry.length || bl ? '9.2' : '9.1') + ' Crash, clarificación y maduración', right: { label: 'Verificación:', check: true },
+    cols: [{ l: 'Concepto', w: 24, k: 'label' }, { l: 'Previsto (ficha)', w: 22, k: 'prev' }, { l: 'Real', w: 16, k: 'real' }, { l: 'Notas', w: 38, k: 'text' }],
+    rows: [['Temperatura del crash', bl ? P('temperatura') : SD, FIELD, 'Ref.: 0–2 °C, bajando 1–2 °C por hora'], ['Duración del crash', bl ? P('horas') : SD, FIELD, 'Ref.: 48–72 h, con el tanque bajo CO₂'],
+      ['Clarificante añadido', fin.length ? fin.map(m => m.name + ' ' + m.amt).join('; ') : (bl ? P('si aplica') : SD), FIELD, 'Dosis real: ___'], ['Purga de levadura', '—', CHECK, 'Con densidad estable y VDK negativa'],
+      ['Maduración (tiempo y temperatura)', ageTxt, FIELD, isLager ? 'Ref.: lager 3–4 sem a 7 °C, 5–6 sem a 4.4 °C o 7–8 sem a 1.7 °C' : isAle ? '' : 'Ref. (si es lager): 3–4 sem a 7 °C, 5–6 sem a 4.4 °C o 7–8 sem a 1.7 °C']] });
+
+  /* ====== 10 CARBONATACIÓN, ENVASADO Y CIERRE ====== */
+  S.push({ t: 'section', title: '10. CARBONATACIÓN, ENVASADO Y CIERRE' });
+  const method = ok(R.primingG) ? R.primingName + ' en botella' : ok(R.carbVols) ? 'Carbonatación forzada o barril' : (bl ? P('método') : SD);
+  const botPrev = ok(R.primingG) ? fg_(R.primingG) + ' de ' + R.primingName.toLowerCase() : (bl ? P('azúcar o CO₂') : '—');
+  const kegPrev = ok(R.carbVols) ? fnum(R.carbVols, 2) + ' vol. de CO₂' : (bl ? P('azúcar o CO₂') : '—');
+  const co2Ref = ok(R.carbVols) ? '' : 'Ref.: respaldo por estilo (base Operativo, sección 8), p. ej. ales americanas y lagers europeas 2.2–2.7 vol.';
+  const bottle = ok(R.primingG), keg = ok(R.carbVols) && !bottle;
+  const rows10 = [['Nivel de CO₂ objetivo (volúmenes)', ok(R.carbVols) ? fnum(R.carbVols, 2) + ' vol.' : sh(NaN, x => x, 'volúmenes de CO₂') + (co2Ref ? '\n' + co2Ref : ''), FIELD, 'Presión según tabla de la base Operativo y temperatura real'],
+    ['Presión y temperatura de la cerveza', '—', 'PSI ___ · °C ___', 'Envasar a 0–2 °C; igualar la presión del envase a la del tanque']];
+  if (bottle || !keg) rows10.push(['Azúcar de priming en botella', botPrev, FIELD, 'Disolver en agua hervida y mezclar con todo el lote. Ref.: ≈ 4.0 g por L × (vol. objetivo − CO₂ residual)']);
+  rows10.push([bottle ? 'Botellas (capacidad: ___)' : keg ? 'Barriles (kegs)' : 'Envases: botellas o barriles', keg ? kegPrev : 'Cantidad', FIELD, 'Purgado con CO₂ [ ]']);
+  rows10.push(['Volumen envasado real', sh(R.finalL, fL, 'volumen'), FIELD, 'Anotar el volumen total']);
+  S.push({ t: 'table', card: true, title: '10.1 Carbonatación y envasado', right: { text: 'Método: ' + method },
+    cols: [{ l: 'Concepto', w: 24, k: 'label' }, { l: 'Previsto (ficha)', w: 22, k: 'prev' }, { l: 'Real', w: 17, k: 'real' }, { l: 'Notas', w: 37, k: 'text' }],
+    rows: rows10 });
+  S.push({ t: 'sensory', title: 'Evaluación sensorial inicial:', items: ['Claridad / apariencia: ___', 'Espuma y retención: ___', 'Aroma (lúpulo y malta): ___', 'Sabor / off-flavors: ___'] });
+  S.push({ t: 'table', noHead: true, cols: [{ w: 22, k: 'label' }, { w: 28, k: 'real' }, { w: 22, k: 'label' }, { w: 28, k: 'real' }],
+    rows: [['Limpieza y sanitización final hecha y anotada (si se omite: ROJO)', CHECK, 'Registrado por:', FIELD], ['Revisado por el cervecero:', FIELD, 'Firma / fecha:', FIELD], ['Estado de cierre (lo define el cervecero):', '[ ] Conforme   [ ] Con desvíos', '', '']] });
+  S.push({ t: 'table', noHead: true, cols: [{ w: 22, k: 'label' }, { w: 78, k: 'real' }], rows: [['Desviaciones, avisos y observaciones del lote', FIELDM]] });
+  return S;
+}
+
+/* ====================== 5. PDF RELLENABLE (pdf-lib) ====================== */
+/* ====================== 3. PDF RELLENABLE (pdf-lib) ====================== */
+
+const COL = {
+  INK: [0x1B, 0x24, 0x30], DARK: [0x10, 0x18, 0x28], ORANGE: [0xF2, 0x8C, 0x28], ORDARK: [0xB4, 0x5C, 0x00], BLUE: [0x1D, 0x5F, 0xC4], PREV: [0xEE, 0xF5, 0xFD],
+  REAL: [0xFF, 0xF8, 0xDC], REALHEAD: [0xFF, 0xF1, 0xC2], HEAD: [0xEE, 0xF2, 0xF7], GRID: [0xCD, 0xD4, 0xDE], MUTED: [0x6B, 0x72, 0x80], BAND: [0xF4, 0xF6, 0xF9],
+  WHITE: [255, 255, 255], REFC: [0x0F, 0x6B, 0x5C], WARNBG: [0xFF, 0xF3, 0xD9], SD: [0xB4, 0x5F, 0x06], BOX: [0x78, 0x82, 0x91], GREYTXT: [0xB8, 0xC0, 0xCC], YEL: [0xF5, 0xC5, 0x42]
+};
+
+async function renderPdf(PDFLib, spec) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const doc = await PDFDocument.create();
+  doc.setTitle('Bitácora de producción cervecera'); doc.setAuthor('Microcervecería artesanal'); doc.setSubject('Ficha de lote: previsto frente a real');
+  const F = await doc.embedFont(StandardFonts.Helvetica), FB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const form = doc.getForm();
+  const charset = new Set(F.getCharacterSet());
+  const safe = t => Array.from(String(t).replace(/−/g, '-').replace(/₂/g, '2').replace(/≈/g, '~').replace(/→/g, '->').replace(/α/g, 'alfa').replace(/β/g, 'beta').replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/•/g, '-').replace(/ | /g, ' '))
+    .map(c => (charset.has(c.codePointAt(0)) ? c : '?')).join('');
+  const c3 = a => rgb(a[0] / 255, a[1] / 255, a[2] / 255);
+  const PW = 595.28, PH = 841.89, ML = 40, MT = 36, MB = 52, W = PW - 2 * ML;
+  let page = null, cy = 0; const pages = []; let fn = 0;
+  const newPage = () => { page = doc.addPage([PW, PH]); pages.push(page); cy = MT; };
+  const ensure = h => { if (cy + h > PH - MB) { newPage(); return true; } return false; };
+  const Y = top => PH - top;
+  const wid = (t, f, s) => f.widthOfTextAtSize(t, s);
+  const textAt = (str, x, base, f, s, color) => page.drawText(safe(str), { x, y: Y(base), size: s, font: f, color: c3(color) });
+  const rect = (x, top, w, h, fill, border, bw) => page.drawRectangle({ x, y: Y(top + h), width: w, height: h, color: fill ? c3(fill) : undefined, borderColor: border ? c3(border) : undefined, borderWidth: border ? (bw || 0.5) : 0 });
+
+  function wrap(text, f, s, maxW) {
+    const words = safe(text).split(/\s+/).filter(Boolean), lines = []; let cur = '';
+    for (const w of words) {
+      let wd = w;
+      while (wid(wd, f, s) > maxW && wd.length > 1) {
+        let k = wd.length; while (k > 1 && wid(wd.slice(0, k), f, s) > maxW) k--;
+        if (cur) { lines.push(cur); cur = ''; }
+        lines.push(wd.slice(0, k)); wd = wd.slice(k);
+      }
+      const t = cur ? cur + ' ' + wd : wd;
+      if (wid(t, f, s) <= maxW) cur = t; else { if (cur) lines.push(cur); cur = wd; }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  }
+  // texto con huecos ___ y casillas [ ] intercalados
+  function inlineLayout(text, f, s, maxW, fieldW) {
+    const toks = [];
+    safe(text).split(/(___|\[ \])/).forEach(seg => {
+      if (seg === '___') toks.push({ t: 'f' }); else if (seg === '[ ]') toks.push({ t: 'c' });
+      else seg.split(/(\s+)/).filter(x => x !== '').forEach(w => toks.push({ t: 'w', s: w }));
+    });
+    const lines = []; let line = { items: [], x: 0, tall: false };
+    const push = () => { lines.push(line); line = { items: [], x: 0, tall: false }; };
+    for (const k of toks) {
+      const w = k.t === 'f' ? fieldW : k.t === 'c' ? 10 : wid(k.s, f, s);
+      const isSpace = k.t === 'w' && /^\s+$/.test(k.s);
+      if (line.x + w > maxW && line.items.length && !isSpace) push();
+      if (isSpace && line.x === 0) continue;
+      line.items.push({ ...k, x: line.x, w }); line.x += w + (k.t === 'f' || k.t === 'c' ? 3 : 0); if (k.t !== 'w') line.tall = true;
+    }
+    if (line.items.length) push();
+    return lines;
+  }
+  function fitField(text, f, s, maxW, lo, hi) {
+    const n = (text.match(/___/g) || []).length, c = (text.match(/\[ \]/g) || []).length; if (!n) return hi;
+    const tw = wid(safe(text.replace(/___|\[ \]/g, '')), f, s);
+    return Math.max(lo, Math.min(hi, (maxW - tw - c * 13) / n - 4));
+  }
+
+  const nextName = p => p + String(++fn).padStart(3, '0');
+  function addText(x, top, w, h, multiline, bg, border) {
+    const tf = form.createTextField(nextName('f'));
+    if (multiline) tf.enableMultiline();
+    tf.addToPage(page, { x, y: Y(top + h), width: w, height: h, borderWidth: border ? 0.5 : 0, borderColor: border ? c3(COL.GRID) : undefined, backgroundColor: c3(bg || COL.REAL), textColor: c3(COL.INK), font: F });
+    tf.setFontSize(8.5);
+  }
+  function addCheck(x, top, size) {
+    const cb = form.createCheckBox(nextName('c'));
+    cb.addToPage(page, { x, y: Y(top + size), width: size, height: size, borderWidth: 1, borderColor: c3(COL.BOX), backgroundColor: c3(COL.WHITE) });
+  }
+
+  /* ---- bloques ---- */
+  function header(b) {
+    const h = 66; ensure(h + 20);
+    rect(ML, cy, W, h, COL.DARK);
+    textAt(b.title, ML + 14, cy + 28, FB, 16, COL.ORANGE);
+    textAt(b.subtitle, ML + 14, cy + 44, F, 8.5, COL.GREYTXT);
+    const lx = ML + W - 150, ly = cy + 7; rect(lx, ly, 138, 52, null, [0x3A, 0x46, 0x5A], 0.5);
+    textAt('Guía de Colores:', lx + 8, ly + 13, FB, 7.5, COL.GREYTXT);
+    rect(lx + 8, ly + 18, 6, 6, [0x5B, 0x9B, 0xF0]); textAt('Azul: Receta (Previsto)', lx + 18, ly + 24, F, 7.5, [0x8F, 0xBB, 0xF5]);
+    rect(lx + 8, ly + 29, 6, 6, COL.YEL); textAt('Amarillo: Registro (Real)', lx + 18, ly + 35, F, 7.5, COL.YEL);
+    rect(lx + 8, ly + 40, 6, 6, [0x4F, 0xC3, 0xA8]); textAt('Verde: Ref. general (no es receta)', lx + 18, ly + 46, F, 7.5, [0x7F, 0xE0, 0xC8]);
+    cy += h + 8;
+  }
+  function section(b) {
+    ensure(30); cy += 5; rect(ML, cy, W, 22, COL.BAND); rect(ML, cy, 3.5, 22, COL.ORANGE);
+    textAt(b.title, ML + 12, cy + 15, FB, 10.5, COL.INK); cy += 26;
+  }
+  function note(b) { const ref = /^Ref\./.test(b.text); wrap(b.text, F, 8, W).forEach(l => { ensure(12); textAt(l, ML, cy + 8, F, 8, ref ? COL.REFC : COL.MUTED); cy += 11; }); cy += 3; }
+  function warn(b) {
+    ensure(40); rect(ML, cy, W, 20, COL.ORDARK); textAt(b.title, ML + 8, cy + 13.5, FB, 8.5, COL.WHITE); cy += 20;
+    b.items.forEach(t => {
+      const ls = wrap(t, F, 8, W - 26), h = ls.length * 10 + 8; ensure(h);
+      rect(ML, cy, W, h, COL.WARNBG, COL.GRID); textAt('-', ML + 8, cy + 11, FB, 9, COL.ORDARK);
+      ls.forEach((l, k) => textAt(l, ML + 18, cy + 11 + k * 10, F, 8, COL.INK)); cy += h;
+    });
+    cy += 8;
+  }
+  function checks(b) {
+    const colW = (W - 24) / 2, rows = Math.ceil(b.items.length / 2), h = rows * 20 + 12; ensure(h + 6);
+    rect(ML, cy, W, h, COL.BAND, COL.GRID);
+    b.items.forEach((t, i) => {
+      const col = i % 2, row = Math.floor(i / 2), x = ML + 12 + col * (colW + 0), top = cy + 8 + row * 20;
+      addCheck(x, top + 2, 10);
+      wrap(t, F, 8.5, colW - 24).slice(0, 2).forEach((l, k) => textAt(l, x + 17, top + 10 + k * 9, F, 8.5, COL.INK));
+    });
+    cy += h + 6;
+  }
+  function kv(b) {
+    const lw = 0.17 * W, vw = 0.33 * W; const cols = [lw, vw, lw, vw];
+    b.rows.forEach(row => {
+      const cells = row.map((c, i) => ({ c, w: cols[i] }));
+      const h = Math.max(24, ...cells.map((x, i) => (x.c === FIELD ? 24 : wrap(x.c, (i % 2 === 0) ? FB : F, 8.5, x.w - 12).length * 11 + 10)));
+      ensure(h); let x = ML;
+      cells.forEach((cell, i) => {
+        const isLabel = i % 2 === 0, isField = cell.c === FIELD;
+        rect(x, cy, cell.w, h, isLabel ? COL.HEAD : (isField ? COL.REAL : COL.PREV), COL.GRID);
+        if (isField) addText(x + 4, cy + (h - 16) / 2, cell.w - 8, 16, false, COL.REAL);
+        else { const ls = wrap(cell.c, isLabel ? FB : F, 8.5, cell.w - 12); ls.forEach((l, k) => textAt(l, x + 6, cy + (h - ls.length * 11) / 2 + 8.5 + k * 11 - 1, isLabel ? FB : F, 8.5, isLabel ? COL.INK : (cell.c.startsWith('Sin dato') ? COL.SD : COL.BLUE))); }
+        x += cell.w;
+      });
+      cy += h;
+    });
+    cy += 6;
+  }
+  function sensory(b) {
+    const h = 48; ensure(h + 6); rect(ML, cy, W, h, null, COL.GRID, 0.5);
+    textAt(b.title, ML + 8, cy + 12, FB, 8, COL.INK);
+    b.items.forEach((t, i) => {
+      const col = i % 2, row = Math.floor(i / 2), cw = (W - 24) / 2, x = ML + 10 + col * (cw + 4), top = cy + 16 + row * 15;
+      const lines = inlineLayout(t, F, 8.5, cw, fitField(t, F, 8.5, cw, 40, 110));
+      lines.forEach(l => l.items.forEach(it => { if (it.t === 'f') addText(x + it.x, top, it.w, 14, false, COL.REAL); else if (it.t === 'w') textAt(it.s, x + it.x, top + 10, F, 8.5, COL.INK); }));
+    });
+    cy += h + 6;
+  }
+
+  const CELL = 8, LEAD = 9.4, PADX = 5, PADY = 3;
+  function tableLayout(b) {
+    const tot = b.cols.reduce((a, c) => a + c.w, 0), widths = b.cols.map(c => W * c.w / tot);
+    const rows = (b.noHead ? [] : [{ head: true }]).concat(b.rows.map(r => ({ cells: r })));
+    return { widths, rows: rows.map(row => {
+      if (row.head) {
+        const cells = b.cols.map((c, i) => ({ k: 'head', lines: wrap(c.l, FB, CELL, widths[i] - 2 * PADX), real: c.k === 'real' }));
+        return { head: true, cells, h: Math.max(...cells.map(c => c.lines.length)) * LEAD + 2 * PADY + 2 };
+      }
+      let h = 0;
+      const cells = row.cells.map((cell, i) => {
+        const col = b.cols[i], inner = widths[i] - 2 * PADX;
+        if (cell && typeof cell === 'object' && 'hint' in cell) { const hl = cell.hint ? wrap(cell.hint, F, 7, inner) : []; const ch = { k: 'hintfield', lines: hl }; h = Math.max(h, hl.length * 8.5 + 18); return ch; }
+        if (cell === FIELD) { h = Math.max(h, 19); return { k: 'field' }; }
+        if (cell === FIELDM) { h = Math.max(h, 42); return { k: 'fieldm' }; }
+        if (cell === CHECK) { h = Math.max(h, 19); return { k: 'check' }; }
+        if (cell === TIME) { h = Math.max(h, 19); return { k: 'time' }; }
+        if (cell === TIME2) { h = Math.max(h, 19); return { k: 'time2' }; }
+        if (typeof cell === 'string' && /___|\[ \]/.test(cell)) {
+          const lines = inlineLayout(cell, F, CELL, inner, fitField(cell, F, CELL, inner, 22, 50));
+          h = Math.max(h, lines.reduce((a, l) => a + (l.tall ? 17 : LEAD), 0) + 2 * PADY - 2); return { k: 'inline', lines };
+        }
+        const bold = col.k === 'label' && (b.noHead || /^TOTAL/.test(String(cell)));
+        const lines = []; String(cell).split('\n').forEach(p => { const isRef = /^Ref\./.test(p), isSd = /^Sin dato/.test(p); wrap(p, bold ? FB : F, CELL, inner).forEach(s => lines.push({ s, ref: isRef, sd: isSd })); });
+        h = Math.max(h, lines.length * LEAD + 2 * PADY + 1);
+        return { k: 'text', lines, bold };
+      });
+      return { cells, h: Math.max(h, 18) };
+    }) };
+  }
+  function drawRow(row, b, widths) {
+    let x = ML; const top = cy;
+    row.cells.forEach((c, i) => {
+      const w = widths[i], col = b.cols[i], kind = col.k;
+      let fill = COL.WHITE;
+      if (c.k === 'head') fill = c.real ? COL.REALHEAD : COL.HEAD;
+      else if (c.k === 'field' || c.k === 'fieldm' || c.k === 'hintfield') fill = COL.REAL;
+      else if (c.k === 'text') fill = kind === 'prev' ? COL.PREV : kind === 'real' ? COL.REAL : (kind === 'label' && !b.noHead ? COL.WHITE : kind === 'label' ? COL.HEAD : COL.WHITE);
+      else if (c.k === 'inline' && kind === 'prev') fill = COL.PREV;
+      rect(x, top, w, row.h, fill, COL.GRID);
+      const inner = w - 2 * PADX;
+      if (c.k === 'head') c.lines.forEach((l, k) => textAt(l, x + PADX, top + PADY + 7.5 + k * LEAD, FB, CELL, c.real ? COL.ORDARK : COL.INK));
+      else if (c.k === 'text') {
+        c.lines.forEach((l, k) => textAt(l.s, x + PADX, top + (row.h - c.lines.length * LEAD) / 2 + 7.5 + k * LEAD, c.bold ? FB : F, CELL, l.sd ? COL.SD : l.ref ? COL.REFC : kind === 'prev' ? COL.BLUE : COL.INK));
+      }
+      else if (c.k === 'field') addText(x + 3, top + (row.h - 16) / 2, w - 6, 16, false, COL.REAL);
+      else if (c.k === 'fieldm') addText(x + 3, top + 3, w - 6, row.h - 6, true, COL.REAL);
+      else if (c.k === 'check') addCheck(x + w / 2 - 5, top + (row.h - 10) / 2, 10);
+      else if (c.k === 'time') addText(x + 3, top + (row.h - 16) / 2, w - 6, 16, false, COL.WHITE, true);
+      else if (c.k === 'time2') { const fw = (w - 6 - 10) / 2; addText(x + 3, top + (row.h - 16) / 2, fw, 16, false, COL.WHITE, true); textAt('/', x + 3 + fw + 3, top + row.h / 2 + 3, F, 9, COL.MUTED); addText(x + 3 + fw + 10, top + (row.h - 16) / 2, fw, 16, false, COL.WHITE, true); }
+      else if (c.k === 'hintfield') {
+        c.lines.forEach((l, k) => textAt(l, x + PADX, top + 9 + k * 8.5, F, 7, COL.MUTED));
+        const fy = top + 3 + c.lines.length * 8.5; addText(x + 3, fy, w - 6, Math.max(15, row.h - (fy - top) - 3), true, COL.REAL);
+      }
+      else if (c.k === 'inline') {
+        let ty = top + PADY - 1;
+        c.lines.forEach(l => {
+          const lh = l.tall ? 17 : LEAD;
+          l.items.forEach(it => {
+            if (it.t === 'f') addText(x + PADX + it.x, ty + (lh - 15) / 2, it.w, 15, false, COL.REAL);
+            else if (it.t === 'c') addCheck(x + PADX + it.x, ty + (lh - 10) / 2, 10);
+            else textAt(it.s, x + PADX + it.x, ty + lh / 2 + 3, F, CELL, COL.INK);
+          });
+          ty += lh;
+        });
+      }
+      x += w;
+    });
+    cy += row.h;
+  }
+  function table(b) {
+    const L = tableLayout(b);
+    if (b.card) {                                    // título de la tarjeta + verificación a la derecha
+      { const tH = L.rows.reduce((a, r) => a + r.h, 0); ensure(26 + (L.rows[0] ? L.rows[0].h : 0) + (L.rows[1] ? L.rows[1].h : 0) + 6); } cy += 4;
+      textAt(b.title, ML + 2, cy + 12, FB, 9.5, COL.ORDARK);
+      if (b.right) {
+        if (b.right.check) { const lw = wid(safe(b.right.label), FB, 8.5); textAt(b.right.label, ML + W - lw - 18, cy + 12, FB, 8.5, COL.ORDARK); addCheck(ML + W - 12, cy + 3, 10); }
+        else { const lw = wid(safe(b.right.text), FB, 8.5); textAt(b.right.text, ML + W - lw - 2, cy + 12, FB, 8.5, COL.ORDARK); }
+      }
+      cy += 18;
+    }
+    const totalH = L.rows.reduce((a, r) => a + r.h, 0);
+    if (!b.card) ensure(20 + (L.rows[0] ? L.rows[0].h : 0) + (L.rows[1] ? L.rows[1].h : 0));
+    
+    for (let i = 0; i < L.rows.length; i++) {
+      const row = L.rows[i], need = row.h + (row.head && L.rows[i + 1] ? L.rows[i + 1].h : 0);
+      if (cy + need > PH - MB) { newPage(); if (!row.head && L.rows[0].head) drawRow(L.rows[0], b, L.widths); }
+      drawRow(row, b, L.widths);
+    }
+    cy += 8;
+  }
+
+  newPage();
+  const H = { header, section, note, warn, checks, kv, sensory, table };
+  spec.forEach((b, i) => {
+    if (b.t === 'section') {
+      let j = i + 1, need = 0;
+      while (spec[j] && spec[j].t === 'note') { need += 36; j++; }
+      const n = spec[j];
+      if (n) {
+        if (n.t === 'table') { const L = tableLayout(n), tH = L.rows.reduce((a, r) => a + r.h, 0); need += (false ? tH : (L.rows[0] ? L.rows[0].h : 0) + (L.rows[1] ? L.rows[1].h : 0)) + (n.card ? 30 : 8); }
+        else if (n.t === 'checks') need += 70; else if (n.t === 'kv') need += 100; else if (n.t === 'warn') need += 70;
+      }
+      ensure(36 + need);
+    }
+    H[b.t](b);
+  });
+  pages.forEach((p, k) => {
+    p.drawLine({ start: { x: ML, y: 34 }, end: { x: PW - ML, y: 34 }, thickness: 0.5, color: c3(COL.GRID) });
+    p.drawText(safe('Ficha de Lote — Proceso Cervecero Estructurado'), { x: ML, y: 22, size: 8, font: F, color: c3(COL.MUTED) });
+    const t = safe('Página ' + (k + 1) + ' de ' + pages.length); p.drawText(t, { x: PW - ML - F.widthOfTextAtSize(t, 8), y: 22, size: 8, font: F, color: c3(COL.MUTED) });
+  });
+  form.updateFieldAppearances(F);
+  return { bytes: await doc.save(), pages: pages.length, fields: fn };
+}
+
+
+/* ====================== 6. ENTRADA ÚNICA ====================== */
+function parseAny(text, forced) {
+  const fmt = forced || detectFormat(text);
+  let R = null;
+  if (fmt === 'beersmith') R = readBeerSmith(text);
+  else if (fmt === 'brewersfriend') R = readBrewersFriend(text);
+  else if (fmt === 'brewfather') R = readBrewfather(text);
+  else if (fmt === 'beerxml') R = readBeerXML(text);
+  if (!R) return null;
+  return { R, format: fmt, formatName: FORMAT_NAME[fmt], A: analyze(R) };
+}
+root.FichaCore = { SD, VERSION, linesFromItems, htmlToText, detectFormat, parseAny, analyze, buildSpec, blankRecipe, renderPdf, FORMAT_NAME };
+if (typeof module !== 'undefined' && module.exports) module.exports = root.FichaCore;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Reporte de lote: el código calcula, el agente interpreta. Global: window.FichaReport (y module.exports en Node). */
+(function (root) {
+'use strict';
+const ok = x => typeof x === 'number' && isFinite(x);
+const num = (x, d) => { if (!ok(x)) return ''; const t = x.toFixed(d === undefined ? 1 : d); return (parseFloat(t) === 0 ? (0).toFixed(d === undefined ? 1 : d) : t).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, ''); };
+const sg = x => ok(x) ? (parseFloat(x.toFixed(3)) === 0 ? '0.000' : x.toFixed(3)) : '';
+const pct = x => ok(x) ? num(x, 1) + ' %' : '';
+
+/* Referencias generales de la base de conocimiento (no son de la receta). */
+const REF = {
+  mashPH: [5.2, 5.6], evapPerH: [8, 10], atten: [70, 82], mermaGlobal: [10, 12], brewEff: [72, 80], mashYield: [75, 85],
+  pitch: { ale: [18, 20], lager: [9, 12] }, pitchMax: 27
+};
+const inR = (v, r) => v >= r[0] && v <= r[1];
+
+/* real: { lote, fecha, cervecero, strikeL, spargeL, topOffL, strikeC, mashPH, preL, preSG, postL, postSG, fermL, og, fg, pitchC,
+           fermDays, finalL, carbVols, primingG, deviations, sensory, grains:[], salts:[], hops:[] }  (NaN o '' = sin dato) */
+function computeReport(R, A, real) {
+  const W = (A && A.water) || {};
+  const rows = []; const findings = []; const missing = [];
+  const sec = (title) => rows.push({ section: title });
+  // add(label, unit, prev, real, opts) -> estado
+  function add(label, unit, prev, rl, o) {
+    o = o || {}; const d = o.d === undefined ? 1 : o.d; const f = o.fmt || (v => num(v, d));
+    const row = { label, unit, prev: ok(prev) ? f(prev) : '', real: ok(rl) ? f(rl) : '', diff: '', ref: o.ref || '', st: 'nodata', derived: !!o.derived };
+    if (ok(rl)) {
+      row.st = 'noref';
+      if (ok(prev) && !o.noDiff) { const df = rl - prev; row.diff = (df > 0 ? '+' : '') + f(df) + (o.diffPct && prev ? ' (' + (df > 0 ? '+' : '') + num(df / prev * 100, 1) + ' %)' : ''); }
+      if (o.judge) { const j = o.judge(rl); if (j) { row.st = j.st; if (j.msg) findings.push({ st: j.st, text: label + ': ' + j.msg }); } }
+    } else if (o.key) missing.push(label);
+    rows.push(row); return row;
+  }
+  const rv = k => (real && ok(real[k])) ? real[k] : NaN;
+  const typ = R.type || '';
+
+  sec('1. Agua');
+  const sPrev = W.strike, spPrev = W.sparge;
+  add('Agua de empaste', 'L', sPrev, rv('strikeL'));
+  add('Agua de lavado agregada', 'L', spPrev, rv('spargeL'), { ref: W.biab ? 'BIAB: sin lavado' : '' });
+  add('Agua en el fermentador (top-off)', 'L', ok(R.topOffL) ? R.topOffL : 0, rv('topOffL'));
+  const parts = ['strikeL', 'spargeL', 'topOffL'].map(rv); const anyPart = parts.some(ok);
+  const sumReal = anyPart ? parts.reduce((a, v) => a + (ok(v) ? v : 0), 0) : NaN;
+  const sumPrev = ok(W.cum) ? W.cum + (ok(R.topOffL) ? R.topOffL : 0) : NaN;
+  const tot = add('Agua total usada (suma)', 'L', sumPrev, sumReal, { derived: true });
+  if (anyPart && parts.some(v => !ok(v)) && tot.real) tot.ref = 'Suma parcial: faltan capturas';
+  add('Temperatura del agua de empaste', '°C', R.strikeC, rv('strikeC'));
+  add('pH del macerado (a 20 °C)', '', R.mashPH, rv('mashPH'), { d: 2, ref: 'Ref. 5.2 a 5.6', judge: v => inR(v, REF.mashPH) ? { st: 'ok' } : { st: 'warn', msg: 'pH ' + num(v, 2) + ' fuera de la referencia 5.2 a 5.6; revisar acidez/sales antes de la siguiente cocinada.' } });
+
+  sec('2. Mosto y hervor');
+  add('Volumen antes del hervor', 'L', R.boilL, rv('preL'));
+  add('Densidad antes del hervor', 'SG', R.preSG, rv('preSG'), { fmt: sg, d: 3 });
+  add('Volumen después del hervor', 'L', R.postBoilL, rv('postL'));
+  add('Densidad después del hervor', 'SG', R.postSG, rv('postSG'), { fmt: sg });
+  const evR = (ok(rv('preL')) && ok(rv('postL')) && rv('preL') > 0 && ok(R.boilMin)) ? (rv('preL') - rv('postL')) / rv('preL') * 100 * 60 / R.boilMin : NaN;
+  const evP = (ok(R.boilL) && ok(R.postBoilL) && R.boilL > 0 && ok(R.boilMin)) ? (R.boilL - R.postBoilL) / R.boilL * 100 * 60 / R.boilMin : NaN;
+  add('Evaporación', '% por hora', evP, evR, { derived: true, ref: 'Ref. 8 a 10 % por hora', judge: v => inR(v, REF.evapPerH) ? { st: 'ok' } : { st: 'warn', msg: 'evaporación de ' + num(v, 1) + ' % por hora fuera de la referencia 8 a 10; ajustar el volumen de agua o la potencia del hervor.' } });
+
+  sec('3. Fermentador');
+  add('Volumen en el fermentador', 'L', R.batchL, rv('fermL'), { key: true });
+  add('Densidad inicial (OG)', 'SG', R.og, rv('og'), { fmt: sg, key: true });
+  const pr = typ && REF.pitch[typ];
+  add('Temperatura al inocular', '°C', NaN, rv('pitchC'), { noDiff: true, ref: pr ? 'Ref. ' + pr[0] + ' a ' + pr[1] + ' °C; no inocular sobre ~27 °C' : 'Ref.: no inocular sobre ~27 °C',
+    judge: v => v > REF.pitchMax ? { st: 'alert', msg: 'inoculación a ' + num(v, 1) + ' °C, sobre ~27 °C: riesgo para la levadura y sabores no deseados; revisar el enfriamiento.' } : (pr ? (inR(v, pr) ? { st: 'ok' } : { st: 'warn', msg: 'inoculación a ' + num(v, 1) + ' °C fuera de la referencia ' + pr[0] + ' a ' + pr[1] + ' °C para ' + (typ === 'lager' ? 'lager' : 'ale') + '.' }) : null) });
+
+  sec('4. Fermentación');
+  add('Densidad final (FG)', 'SG', R.fg, rv('fg'), { fmt: sg, key: true });
+  const ogR = rv('og'), fgR = rv('fg');
+  const attP = (ok(R.og) && ok(R.fg) && R.og > 1) ? (R.og - R.fg) / (R.og - 1) * 100 : NaN;
+  const attR = (ok(ogR) && ok(fgR) && ogR > 1) ? (ogR - fgR) / (ogR - 1) * 100 : NaN;
+  add('Atenuación aparente', '%', attP, attR, { derived: true, ref: 'Ref. 70 a 82 %', judge: v => inR(v, REF.atten) ? { st: 'ok' } : { st: 'warn', msg: 'atenuación de ' + num(v, 1) + ' % fuera de la referencia 70 a 82 %; revisar levadura, temperatura y mosto.' } });
+  const abvP = ok(R.abv) ? R.abv : ((ok(R.og) && ok(R.fg)) ? (R.og - R.fg) * 131.25 : NaN);
+  const abvR = (ok(ogR) && ok(fgR)) ? (ogR - fgR) * 131.25 : NaN;
+  add('Alcohol (ABV)', '%', abvP, abvR, { derived: true, ref: '(OG − FG) × 131.25' });
+  add('Días de fermentación', 'd', NaN, rv('fermDays'), { noDiff: true, d: 0 });
+
+  sec('5. Envasado');
+  add('Volumen envasado', 'L', R.finalL, rv('finalL'), { key: true });
+  add('Carbonatación', 'vol. CO₂', R.carbVols, rv('carbVols'), { d: 2 });
+  add('Azúcar de priming', 'g', R.primingG, rv('primingG'));
+
+  sec('6. Mermas');
+  const mer = (a, b) => (ok(a) && ok(b) && a > 0) ? (a - b) / a * 100 : NaN;
+  add('Merma de cocción (olla a fermentador)', '%', mer(R.postBoilL, R.batchL), mer(rv('postL'), rv('fermL')), { derived: true, ref: '(vol. olla − vol. fermentador) ÷ vol. olla' });
+  add('Merma de trasvase (fermentador a envase)', '%', mer(R.batchL, R.finalL), mer(rv('fermL'), rv('finalL')), { derived: true, ref: '(vol. fermentador − vol. envasado) ÷ vol. fermentador' });
+  add('Merma global (olla a envase)', '%', mer(R.postBoilL, R.finalL), mer(rv('postL'), rv('finalL')), { derived: true, ref: 'Ref. menos de 10 a 12 %',
+    judge: v => v <= REF.mermaGlobal[0] ? { st: 'ok' } : (v <= REF.mermaGlobal[1] ? { st: 'warn', msg: 'merma global de ' + num(v, 1) + ' %, entre 10 y 12 %: vigilar.' } : { st: 'alert', msg: 'merma global de ' + num(v, 1) + ' %, sobre 12 %: revisar dónde se perdió el volumen.' + (mer(R.postBoilL, R.finalL) > 12 ? ' La propia receta ya prevé ' + num(mer(R.postBoilL, R.finalL), 1) + ' % (volumen después del hervor frente a volumen envasado): confirmar esas cifras con el cervecero.' : '') }) });
+
+  sec('7. Rendimiento (estimado)');
+  // Estimación por proporción respecto a la receta: asume el mismo tipo de grano y la eficiencia de la receta como base.
+  const gP = (R.grains || []).reduce((a, g) => a + (ok(g.kg) ? g.kg : 0), 0);
+  const gR = (R.grains || []).reduce((a, g, i) => a + (real && real.grains && ok(real.grains[i]) ? real.grains[i] : (ok(g.kg) ? g.kg : 0)), 0);
+  const sc = (ptsR, vR, ptsP, vP, base) => (ok(ptsR) && ok(vR) && ok(ptsP) && ok(vP) && ok(base) && gR > 0 && gP > 0 && ptsP > 0 && vP > 0) ? base * (ptsR * vR) / (ptsP * vP) * (gP / gR) : NaN;
+  const ptsOG = x => ok(x) ? (x - 1) * 1000 : NaN;
+  add('Eficiencia de sala', '%', R.effPct, sc(ptsOG(ogR), rv('fermL'), ptsOG(R.og), R.batchL, R.effPct), { derived: true, ref: 'Ref. 72 a 80 %. Estimada por proporción con la receta',
+    judge: v => inR(v, REF.brewEff) ? { st: 'ok' } : { st: 'warn', msg: 'eficiencia estimada de ' + num(v, 1) + ' %, fuera de la referencia 72 a 80 % (es una estimación a partir de la receta).' } });
+  add('Rendimiento del macerado', '%', R.mashEffPct, sc(ptsOG(rv('preSG')), rv('preL'), ptsOG(R.preSG), R.boilL, R.mashEffPct), { derived: true, ref: 'Ref. 75 a 85 %. Estimado por proporción con la receta',
+    judge: v => inR(v, REF.mashYield) ? { st: 'ok' } : { st: 'warn', msg: 'rendimiento de macerado estimado de ' + num(v, 1) + ' %, fuera de la referencia 75 a 85 %.' } });
+
+  // insumos
+  const lists = [['Maltas y fermentables', 'grains', 'kg', 'kg', 2], ['Sales de agua', 'salts', 'g', 'g', 2], ['Lúpulos', 'hops', 'g', 'g', 1]];
+  lists.forEach(([title, key, , unit, d], idx) => {
+    const items = R[key] || []; if (!items.length) return;
+    sec((8 + idx) + '. ' + title + ': previsto frente a real');
+    let sp = 0, sr = 0, allReal = true;
+    items.forEach((it, i) => {
+      const prevV = key === 'grains' ? it.kg : it.g; const rl = real && real[key] ? real[key][i] : NaN;
+      let lab = it.name || ('Fila ' + (i + 1));
+      if (key === 'salts' && it.stage) lab += ' (' + it.stage.toLowerCase() + ')';
+      if (key === 'hops') lab += ' (' + ({ boil: 'hervor', fwh: 'primer mosto', whirlpool: 'whirlpool', dry: 'dry hop', other: 'otro' }[it.kind] || 'hervor') + (ok(it.time) ? ' ' + num(it.time, 0) + (it.kind === 'dry' ? ' d' : ' min') : '') + ')';
+      if (ok(prevV)) sp += prevV; if (ok(rl)) sr += rl; else allReal = false;
+      add(lab, unit, prevV, rl, { d, diffPct: true });
+    });
+    const t = add('Total ' + title.toLowerCase().split(' ')[0] + ' (suma)', unit, sp, allReal ? sr : NaN, { d, derived: true, diffPct: true });
+    if (!allReal && items.some((_, i) => real && real[key] && ok(real[key][i]))) { t.real = ''; t.diff = ''; t.ref = 'Suma incompleta: faltan filas por capturar'; }
+  });
+
+  // dictamen sugerido
+  const alerts = findings.filter(f => f.st === 'alert'), warns = findings.filter(f => f.st === 'warn');
+  let dict;
+  if (alerts.length) dict = { st: 'alert', text: 'Sugerido: retener el lote y revisarlo con el cervecero antes de liberarlo.' };
+  else if (missing.length) dict = { st: 'nodata', text: 'Sugerido: dictamen no concluyente; faltan datos clave (' + missing.join(', ') + ').' };
+  else if (warns.length) dict = { st: 'warn', text: 'Sugerido: aprobar con observaciones, a juicio del cervecero.' };
+  else dict = { st: 'ok', text: 'Sugerido: sin desviaciones fuera de referencia con los datos capturados.' };
+  if (alerts.length && missing.length) dict.text += ' Además faltan datos clave: ' + missing.join(', ') + '.';
+  return { rows, findings, missing, dictamen: dict, alerts: alerts.length, warns: warns.length };
+}
+
+/* Resumen en texto para pegar en el agente (él interpreta; el código ya calculó). */
+function summaryText(R, rep, real) {
+  const L = [];
+  L.push('REPORTE DE LOTE PARA INTERPRETAR. Receta: ' + (R.name || 'sin nombre') + (R.style ? ' (' + R.style + ')' : '') + (real && real.lote ? '. Lote: ' + real.lote : '') + '.');
+  L.push('Los cálculos ya están hechos por la página; interpreta causas probables y qué corregir en la siguiente cocinada, sin cambiar las cifras. Las referencias son generales de la base de conocimiento.');
+  rep.rows.forEach(r => { if (r.section) { L.push('\n' + r.section); return; } if (r.real || r.prev) L.push('- ' + r.label + ' [' + r.unit + ']: previsto ' + (r.prev || 'sin dato') + '; real ' + (r.real || 'sin dato') + (r.diff ? '; diferencia ' + r.diff : '') + (r.st === 'warn' ? ' (AMARILLO)' : r.st === 'alert' ? ' (ROJO)' : r.st === 'ok' ? ' (verde)' : '') + (r.ref ? '. ' + r.ref : '')); });
+  if (rep.findings.length) { L.push('\nHallazgos:'); rep.findings.forEach(f => L.push('- ' + (f.st === 'alert' ? 'ROJO' : 'AMARILLO') + ': ' + f.text)); }
+  L.push('\n' + rep.dictamen.text);
+  if (real && real.deviations) L.push('\nDesviaciones anotadas por el cervecero: ' + real.deviations);
+  if (real && real.sensory) L.push('Evaluación sensorial anotada: ' + real.sensory);
+  return L.join('\n');
+}
+
+const COL = { NAVY: [0x1F, 0x3A, 0x5F], INK: [0x1B, 0x24, 0x30], MUTED: [0x6B, 0x72, 0x80], GRID: [0xCD, 0xD4, 0xDE], HEAD: [0xEE, 0xF2, 0xF7], WHITE: [255, 255, 255],
+  ok: [0xD7, 0xF0, 0xE0], warn: [0xFF, 0xF1, 0xC2], alert: [0xFB, 0xD5, 0xD0], nodata: [0xF4, 0xF6, 0xF9], noref: null };
+const ST_LABEL = { ok: 'Verde', warn: 'Amarillo', alert: 'Rojo' };
+
+async function renderReport(PDFLib, R, rep, real) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const doc = await PDFDocument.create();
+  doc.setTitle('Reporte de lote'); doc.setSubject('Real frente a previsto'); doc.setAuthor('Generador de fichas de lote');
+  const F = await doc.embedFont(StandardFonts.Helvetica), FB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const cs = new Set(F.getCharacterSet());
+  const safe = t => Array.from(String(t == null ? '' : t).replace(/−/g, '-').replace(/₂/g, '2').replace(/≈/g, '~').replace(/→/g, '->').replace(/α/g, 'alfa').replace(/β/g, 'beta').replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/•/g, '-').replace(/[  ]/g, ' ').replace(/[\r\n\t]+/g, ' '))
+    .map(c => cs.has(c.codePointAt(0)) ? c : '?').join('');
+  const c3 = a => rgb(a[0] / 255, a[1] / 255, a[2] / 255);
+  const PW = 595.28, PH = 841.89, ML = 40, MT = 40, MB = 50, W = PW - 2 * ML;
+  const pages = []; let page, cy;
+  const newPage = () => { page = doc.addPage([PW, PH]); pages.push(page); cy = MT; };
+  const ensure = h => { if (cy + h > PH - MB) { newPage(); return true; } return false; };
+  const txt = (s, x, y, size, font, color) => page.drawText(safe(s), { x, y: PH - y, size, font: font || F, color: c3(color || COL.INK) });
+  const rect = (x, y, w, h, fill, line) => page.drawRectangle({ x, y: PH - y - h, width: w, height: h, color: fill ? c3(fill) : undefined, borderColor: line ? c3(line) : undefined, borderWidth: line ? 0.6 : 0 });
+  const wrap = (s, font, size, maxW) => {
+    const words = safe(s).split(' '); const out = []; let cur = '';
+    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (font.widthOfTextAtSize(t, size) <= maxW || !cur) cur = t; else { out.push(cur); cur = w; } });
+    if (cur) out.push(cur); return out;
+  };
+  const para = (s, size, font, color, x, maxW, lead) => { wrap(s, font || F, size, maxW).forEach(l => { ensure(lead || size + 3); txt(l, x, cy + size, size, font, color); cy += lead || size + 3; }); };
+
+  newPage();
+  // encabezado
+  rect(0, 0, PW, 78, COL.NAVY);
+  txt('Reporte de lote', ML, 34, 20, FB, COL.WHITE);
+  txt((R.name || 'Receta sin nombre') + (R.style ? ' | ' + R.style : ''), ML, 54, 10.5, F, COL.WHITE);
+  const meta = [real && real.lote ? 'Lote: ' + real.lote : '', real && real.fecha ? 'Fecha: ' + real.fecha : '', real && real.cervecero ? 'Cervecero: ' + real.cervecero : ''].filter(Boolean).join('   ');
+  if (meta) txt(meta, ML, 69, 9, F, COL.WHITE);
+  cy = 96;
+  // dictamen sugerido
+  const dl = wrap(rep.dictamen.text, FB, 11, W - 24); const dh = 30 + dl.length * 14;
+  rect(ML, cy, W, dh, COL[rep.dictamen.st] || COL.nodata, COL.GRID);
+  txt('DICTAMEN SUGERIDO POR EL CÁLCULO (no es la decisión final)', ML + 12, cy + 16, 8.5, FB, COL.MUTED);
+  dl.forEach((l, i) => txt(l, ML + 12, cy + 31 + i * 14, 11, FB));
+  cy += dh + 8;
+  txt('Alertas rojas: ' + rep.alerts + '   Amarillas: ' + rep.warns + '   Datos clave faltantes: ' + rep.missing.length, ML, cy + 9, 9, F, COL.MUTED); cy += 20;
+  if (rep.findings.length) {
+    txt('Hallazgos', ML, cy + 11, 11, FB, COL.NAVY); cy += 18;
+    rep.findings.forEach(f => {
+      const ls = wrap(f.text, F, 9.5, W - 26); ensure(ls.length * 12 + 6);
+      rect(ML, cy + 2, 8, 8, COL[f.st], COL.GRID);
+      ls.forEach((l, i) => { txt(l, ML + 16, cy + 10 + i * 12, 9.5); }); cy += ls.length * 12 + 4;
+    });
+    cy += 6;
+  }
+  para('Colores: verde = dentro de la referencia general; amarillo = fuera de la referencia; rojo = límite crítico; sin color = no hay referencia en la base de conocimiento.', 8, F, COL.MUTED, ML, W, 10); cy += 6;
+
+  // tabla
+  const cols = [{ w: 170, t: 'Parámetro' }, { w: 62, t: 'Previsto' }, { w: 62, t: 'Real' }, { w: 62, t: 'Diferencia' }, { w: W - 170 - 186, t: 'Referencia / nota' }];
+  const colX = []; let ax = ML; cols.forEach(c => { colX.push(ax); ax += c.w; });
+  const head = () => { rect(ML, cy, W, 16, COL.HEAD, COL.GRID); cols.forEach((c, i) => txt(c.t, colX[i] + 4, cy + 11, 8.5, FB)); cy += 16; };
+  let first = true;
+  rep.rows.forEach(r => {
+    if (r.section) { ensure(16 + 16 + 20); cy += first ? 0 : 6; first = false; txt(r.section, ML, cy + 11, 10.5, FB, COL.NAVY); cy += 16; head(); return; }
+    const lab = wrap(r.label + (r.unit ? ' (' + r.unit + ')' : ''), F, 8.5, cols[0].w - 8), refl = wrap(r.ref, F, 7.5, cols[4].w - 8);
+    const n = Math.max(lab.length, refl.length, 1), h = n * 10 + 6;
+    if (ensure(h + 2)) head();
+    rect(ML, cy, W, h, null, COL.GRID);
+    const fillc = COL[r.st]; if (r.real && fillc) rect(colX[2], cy, cols[2].w, h, fillc, COL.GRID);
+    lab.forEach((l, i) => txt(l, colX[0] + 4, cy + 10 + i * 10, 8.5, r.derived ? FB : F));
+    txt(r.prev || '-', colX[1] + 4, cy + 10, 8.5, F, r.prev ? COL.INK : COL.MUTED);
+    txt(r.real || '-', colX[2] + 4, cy + 10, 8.5, FB, r.real ? COL.INK : COL.MUTED);
+    txt(r.diff || '', colX[3] + 4, cy + 10, 8, F);
+    refl.forEach((l, i) => txt(l, colX[4] + 4, cy + 9.5 + i * 10, 7.5, F, COL.MUTED));
+    cy += h;
+  });
+  cy += 10;
+  // notas capturadas
+  const notes = [['Desviaciones y observaciones del cervecero (capturadas)', real && real.deviations], ['Evaluación sensorial (capturada)', real && real.sensory]];
+  notes.forEach(([t, v]) => { if (!v) return; ensure(40); txt(t, ML, cy + 11, 10, FB, COL.NAVY); cy += 16; para(String(v), 9.5, F, COL.INK, ML, W, 12); cy += 6; });
+  // firma
+  ensure(150); cy += 6;
+  txt('Dictamen final del cervecero', ML, cy + 11, 11, FB, COL.NAVY); cy += 20;
+  txt('[   ] Aprobado        [   ] Aprobado con observaciones        [   ] Retenido', ML, cy + 10, 10, F); cy += 26;
+  for (let i = 0; i < 3; i++) { page.drawLine({ start: { x: ML, y: PH - cy - 12 }, end: { x: ML + W, y: PH - cy - 12 }, thickness: 0.5, color: c3(COL.GRID) }); cy += 20; }
+  cy += 14;
+  [['Nombre', 0, 230], ['Firma', 250, 150], ['Fecha', 420, W - 420]].forEach(([t, x, w]) => { page.drawLine({ start: { x: ML + x, y: PH - cy }, end: { x: ML + x + w, y: PH - cy }, thickness: 0.7, color: c3(COL.INK) }); txt(t, ML + x, cy + 10, 8.5, F, COL.MUTED); });
+  cy += 16;
+  // pie neutral y numeración
+  pages.forEach((p, i) => { const y = PH - (PH - 28); p.drawText(safe('Reporte generado con el Generador de fichas de lote. El cálculo es automático con los datos capturados; el dictamen es una sugerencia y la decisión final es del cervecero.'), { x: ML, y: 30, size: 7, font: F, color: c3(COL.MUTED) }); p.drawText('Página ' + (i + 1) + ' de ' + pages.length, { x: PW - ML - 52, y: 20, size: 7.5, font: F, color: c3(COL.MUTED) }); });
+  return { bytes: await doc.save(), pages: pages.length };
+}
+
+const api = { computeReport, renderReport, summaryText, REF };
+root.FichaReport = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+(function () {
+'use strict';
+const C = window.FichaCore;
+const SAMPLE = `blonde 120l 4.2% ibu15 v4.3.5
+Blonde Ale (18 A)
+Type: All Grain
+Batch Size: 141.00 L
+Boil Size: 163.12 L
+Boil Time: 60 min
+End of Boil Vol: 153.13 L
+Final Bottling Vol: 120.00 L
+Fermentation: Ale, Two Stage
+Date: 23 May 2020
+Brewer: bernabe
+Asst Brewer:
+Equipment: costa rica 120l
+Efficiency: 72.00 %
+Est Mash Efficiency: 75.1 %
+Taste Rating: 30.0
+Taste Notes:
+Prepare for Brewing
+◯ Hydrate yeast with 1690.67 ml warm water and add optional 84.5 g of GoFerm
+◯ Clean and Prepare Brewing Equipment
+◯ Total Water Needed: 192.09 L
+◯ Mash Water Acid: None
+Water Prep
+Amt Name Type # %/IBU Volume
+192.09 L costa 6.8 Water 1 - -
+7.31 g Calcium Chloride (Mash) Water Agent 2 - -
+5.84 g Gypsum (Calcium Sulfate) (Mash) Water Agent 3 - -
+4.60 g Epsom Salt (MgSO4) (Mash) Water Agent 4 - -
+0.83 g Salt (Mash) Water Agent 5 - -
+Mash or Steep Grains
+Mash Ingredients
+Amt Name Type # %/IBU Volume
+24.00 kg Pale Malt (2 Row) US (2.0 SRM) Grain 6 89.1 % 15.65 L
+1.50 kg Cara-Pils/Dextrine (2.0 SRM) Grain 7 5.6 % 0.98 L
+1.42 kg Oats, Flaked (1.0 SRM) Grain 8 5.3 % 0.93 L
+13.55 g Calcium Chloride (Sparge) Water Agent 9 - -
+10.82 g Gypsum (Calcium Sulfate) (Sparge) Water Agent 10 - -
+8.53 g Epsom Salt (MgSO4) (Sparge) Water Agent 11 - -
+1.54 g Salt (Sparge) Water Agent 12 - -
+Mash Steps
+Name Description Step 
+Temperature Step Time
+Mash In Add 67.31 L of water at 76.1 C 69.0 C 60 min
+◯ Sparge Water Acid: None
+◯ Fly sparge with 124.78 L water at 75.6 C
+◯ Add water to achieve boil volume of 163.12 L
+◯ Estimated pre-boil gravity is 1.037 SG
+Boil Ingredients
+Amt Name Type # %/IBU Volume
+1.50 oz Cascade [5.50 %] - Boil 60.0 min Hop 13 4.5 IBUs -
+1.50 oz Cascade [5.50 %] - Boil 30.0 min Hop 14 3.5 IBUs -
+2.00 oz Cascade [5.50 %] - Boil 10.0 min Hop 15 2.2 IBUs -
+5.00 oz Cascade [5.50 %] - Boil 5.0 min Hop 16 3.0 IBUs -
+Steeped Hops
+blonde 120l 4.2% ibu15 v4.3.5 Page 1 of 2
+file:///C:/Users/admin/Documents/BeerSmith3/Reports/bsxtmp_1464.htm 13/06/2020
+Amt Name Type # %/IBU Volume
+6.00 oz Cascade [5.50 %] - Steep/Whirlpool 20.0 min, 80.0 C Hop 17 2.5 IBUs -
+◯ Estimated Post Boil Vol: 153.13 L and Est Post Boil Gravity: 1.042 SG
+Cool and Transfer Wort
+◯ Cool wort to fermentation temperature
+◯ Transfer wort to fermenter
+◯ Add water if needed to achieve final volume of 141.00 L
+Pitch Yeast and Measure Gravity and Volume
+Fermentation Ingredients
+Amt Name Type # %/IBU Volume
+6.0 pkg Safale American (DCL/Fermentis #US-05) [50.28 ml] Yeast 18 - -
+◯ Measure Actual Original Gravity _______ (Target: 1.042 SG)
+◯ Measure Actual Batch Volume _______ (Target: 141.00 L)
+Fermentation
+◯ 23 May 2020 - Primary Fermentation (4.00 days at 19.4 C ending at 19.4 C) 
+◯ 27 May 2020 - Secondary Fermentation (10.00 days at 19.4 C ending at 19.4 C) 
+Dry Hop and Bottle/Keg
+◯ Measure Final Gravity: _________ (Estimate: 1.010 SG)
+◯ Date Bottled/Kegged: 06 Jun 2020 - Carbonation: Bottle with 24.90 oz Corn Sugar
+◯ Age beer for 30.00 days at 18.3 C
+◯ 06 Jul 2020 - Drink and enjoy!
+Notes
+blonde 120l 4.2% ibu15 v4.3.5 Page 2 of 2
+file:///C:/Users/admin/Documents/BeerSmith3/Reports/bsxtmp_1464.htm 13/06/2020
+`;
+const $ = id => document.getElementById(id);
+let R = null, FORMAT = '', MODE = 'ficha', REAL = {}, SNAP = null;
+const RP = window.FichaReport;
+
+function setMsg(el, text, kind) { el.hidden = !text; el.textContent = text || ''; el.className = 'status' + (kind ? ' ' + kind : ''); }
+function setWarn(el, A) {
+  el.textContent = '';
+  if (!A || !A.warn.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const b = document.createElement('b'); b.textContent = A.warn.length === 1 ? 'Un aviso de la lectura (también va impreso en la página 1 de la ficha):' : A.warn.length + ' avisos de la lectura (también van impresos en la página 1 de la ficha):';
+  const ul = document.createElement('ul'); ul.className = 'warnl';
+  A.warn.forEach(w => { const li = document.createElement('li'); li.textContent = w; ul.appendChild(li); });
+  el.append(b, ul);
+}
+
+/* ---------- lectura de archivos ---------- */
+async function readPdf(file) {
+  if (!window.pdfjsLib) throw new Error('No se pudo cargar el lector de PDF. Usa la opción de pegar el texto.');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  let lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const content = await (await pdf.getPage(p)).getTextContent();
+    lines = lines.concat(C.linesFromItems(content.items));
+  }
+  return lines.join('\n');
+}
+async function readAny(file) {
+  const name = file.name.toLowerCase();
+  if (/\.pdf$/.test(name) || file.type === 'application/pdf') return readPdf(file);
+  const t = await file.text();
+  return /<html|<table|<body/i.test(t.slice(0, 3000)) && !/<RECIPES?[\s>]/i.test(t.slice(0, 3000)) ? C.htmlToText(t) : t;
+}
+const FORMATS = "BeerSmith, Brewer's Friend, Brewfather (PDF) o BeerXML";
+function load(text, label) {
+  let res = null;
+  try { res = C.parseAny(text); } catch (e) { res = null; console.error(e); }
+  const R0 = res && res.R;
+  const hits = R0 ? R0.grains.length + R0.hops.length + (isFinite(R0.batchL) ? 1 : 0) + (isFinite(R0.og) ? 1 : 0) : 0;
+  if (!res || hits < 3) {
+    R = null; $('review').hidden = true; vis();
+    setMsg($('msg'), 'No reconocí una receta de ' + FORMATS + ' en ' + label + '. Revisa que sea el reporte de receta con texto seleccionable (no una foto o escaneo). También puedes pegar el texto abajo.', 'warn');
+    return;
+  }
+  R = R0; FORMAT = res.formatName;
+  setMsg($('msg'), 'Leí ' + label + ' como receta de ' + FORMAT + '. Revisa los datos en el paso 2.', 'ok');
+  REAL = {}; SNAP = null; renderReview(); $('review').hidden = false; vis();
+  $('review').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function onFile(file) {
+  if (!file) return;
+  setMsg($('msg'), 'Leyendo ' + file.name + '…');
+  try { load(await readAny(file), file.name); }
+  catch (e) { setMsg($('msg'), 'No pude leer el archivo: ' + (e && e.message ? e.message : e) + ' Prueba pegando el texto de la receta.', 'warn'); }
+}
+
+/* ---------- revisión editable ---------- */
+// tipos: t = texto, n = número, s = lista de opciones
+const GROUPS = [
+  ['Receta', [['name', 'Nombre de la receta', 't'], ['style', 'Estilo', 't'], ['type', 'Tipo', 's', [['', 'Sin definir'], ['ale', 'Ale'], ['lager', 'Lager']]], ['method', 'Método', 't'], ['equipment', 'Equipo', 't'], ['brewer', 'Cervecero que definió la ficha', 't']]],
+  ['Volúmenes (L)', [['batchL', 'Volumen en el fermentador', 'n'], ['finalL', 'Volumen final envasado', 'n'], ['boilL', 'Volumen antes del hervor', 'n'], ['postBoilL', 'Volumen después del hervor', 'n']]],
+  ['Densidades y rendimiento', [['preSG', 'Antes del hervor (SG)', 'n'], ['postSG', 'Después del hervor (SG)', 'n'], ['og', 'Inicial (OG)', 'n'], ['fg', 'Final estimada (FG)', 'n'], ['ibu', 'IBU', 'n'], ['abv', '% ABV de la receta', 'n'], ['effPct', 'Eficiencia de sala (%)', 'n'], ['mashEffPct', 'Rendimiento de macerado (%)', 'n']]],
+  ['Agua y proceso', [['strikeL', 'Agua de empaste (L)', 'n'], ['strikeC', 'Temp. agua de empaste (°C)', 'n'], ['spargeL', 'Agua de lavado: agregar (L)', 'n'], ['spargeC', 'Temp. agua de lavado (°C)', 'n'], ['totalL', 'Agua total de la receta (L)', 'n'], ['topOffL', 'Agua en el fermentador (L)', 'n'], ['boilMin', 'Tiempo de hervor (min)', 'n'], ['mashPH', 'pH de macerado previsto', 'n']]],
+  ['Levadura, envasado y maduración', [['hydrate', 'Hidratación o starter de la levadura', 't'], ['carbVols', 'Carbonatación (volúmenes de CO₂)', 'n'], ['primingG', 'Azúcar de priming (g)', 'n'], ['primingName', 'Azúcar de priming: tipo', 't'], ['ageDays', 'Maduración: días', 'n'], ['ageC', 'Maduración: temperatura (°C)', 'n']]]
+];
+const STAGES = [['Empaste', 'Empaste'], ['Lavado', 'Lavado'], ['Hervor', 'Hervor']];
+const LISTS = [
+  ['grains', 'Granos y fermentables', [['name', 'Nombre', '1fr', 't'], ['kg', 'kg', '80px', 'n'], ['boilMin', 'Min en hervor (si va al hervor)', '110px', 'n']]],
+  ['salts', 'Sales de agua', [['name', 'Nombre', '1fr', 't'], ['g', 'g', '80px', 'n'], ['stage', 'Etapa', '110px', 's', STAGES]]],
+  ['misc', 'Ácido, clarificante, nutriente y otros', [['name', 'Nombre', '1fr', 't'], ['amt', 'Cantidad', '100px', 't'], ['stage', 'Etapa', '110px', 't'], ['time', 'Min', '64px', 'n']]],
+  ['mash', 'Pasos de macerado', [['name', 'Nombre', '1fr', 't'], ['tempC', '°C', '80px', 'n'], ['min', 'Minutos', '80px', 'n']]],
+  ['hops', 'Lúpulos', [['kind', 'Momento', '120px', 's', [['boil', 'Hervor'], ['fwh', 'Primer mosto'], ['whirlpool', 'Whirlpool'], ['dry', 'Dry hop'], ['other', 'Otro']]], ['name', 'Nombre', '1fr', 't'], ['alpha', '% alfa', '64px', 'n'], ['g', 'g', '72px', 'n'], ['time', 'Min (o días en dry hop)', '90px', 'n'], ['temp', '°C', '60px', 'n']]],
+  ['yeast', 'Levadura', [['name', 'Cepa', '1fr', 't'], ['amt', 'Cantidad', '120px', 't']]],
+  ['ferm', 'Fermentación', [['kind', 'Etapa', '120px', 's', [['primary', 'Primaria'], ['secondary', 'Secundaria'], ['tertiary', 'Terciaria'], ['conditioning', 'Acondicionamiento']]], ['days', 'Días', '80px', 'n'], ['tempC', '°C', '1fr', 'n']]]
+];
+const BLANK = { grains: { name: '', kg: NaN }, salts: { name: '', g: NaN, stage: 'Empaste' }, misc: { name: '', amt: '', stage: 'Hervor', time: NaN }, mash: { name: '', tempC: NaN, min: NaN },
+  hops: { kind: 'boil', name: '', alpha: NaN, g: NaN, time: NaN, temp: NaN }, yeast: { name: '', amt: '' }, ferm: { kind: 'primary', days: NaN, tempC: NaN } };
+const isNum = x => typeof x === 'number' && isFinite(x);
+const showV = v => isNum(v) ? String(Math.round(v * 10000) / 10000) : (typeof v === 'string' ? v : '');
+const readV = (s, t) => t === 'n' ? (s.trim() === '' ? NaN : parseFloat(s.replace(',', '.'))) : s;
+const isEmptyV = v => v === undefined || v === null || v === '' || (typeof v === 'number' && !isFinite(v));
+function refresh() { const A = C.analyze(R); setWarn($('warn1'), A); setWarn($('warn3'), A); return A; }
+
+function renderReview() {
+  const A = refresh();
+  const chips = $('chips'); chips.textContent = '';
+  const mk = (t, miss) => { const s = document.createElement('span'); s.className = 'chip' + (miss ? ' miss' : ''); s.textContent = t; chips.appendChild(s); };
+  const pl = (n, a, b) => n + ' ' + (n === 1 ? a : b);
+  mk('Formato: ' + FORMAT);
+  mk(R.type ? 'Tipo: ' + (R.type === 'lager' ? 'lager' : 'ale') + (R.typeBy ? ' (según ' + R.typeBy + ')' : '') : 'Tipo sin definir', !R.type);
+  if (R.imperial) mk('Convertida de unidades imperiales');
+  if (A.water.biab) mk('BIAB: sin lavado');
+  mk(pl(R.grains.length, 'grano', 'granos'), !R.grains.length); mk(pl(R.hops.length, 'lúpulo', 'lúpulos'), !R.hops.length); mk(pl(R.mash.length, 'paso de macerado', 'pasos de macerado'), !R.mash.length);
+  mk(pl(R.ferm.length, 'etapa de fermentación', 'etapas de fermentación'), !R.ferm.length); mk(isNum(R.og) ? 'OG ' + R.og : 'Sin OG', !isNum(R.og));
+
+  const form = $('form'); form.textContent = '';
+  GROUPS.forEach(([title, fields]) => {
+    const box = document.createElement('div'); const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
+    const g = document.createElement('div'); g.className = 'grid';
+    fields.forEach(([key, label, t, opts]) => {
+      const f = document.createElement('div'); f.className = 'f';
+      const id = 'in-' + key; const lb = document.createElement('label'); lb.htmlFor = id; lb.textContent = label;
+      let inp;
+      if (t === 's') { inp = document.createElement('select'); opts.forEach(o => { const op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; inp.appendChild(op); }); inp.value = R[key] || ''; inp.id = id; inp.addEventListener('change', () => { R[key] = inp.value; if (key === 'type') R.typeBy = ''; refresh(); }); }
+      else {
+        inp = document.createElement('input'); inp.type = 'text'; inp.id = id; inp.value = showV(R[key]); if (t === 'n') inp.inputMode = 'decimal';
+        const mark = () => inp.classList.toggle('miss', !inp.value.trim());
+        mark(); inp.addEventListener('input', () => { R[key] = readV(inp.value, t); mark(); refresh(); });
+      }
+      f.append(lb, inp); g.appendChild(f);
+    });
+    box.appendChild(g); form.appendChild(box);
+  });
+  const bw = document.createElement('label'); bw.className = 'chk'; const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!R.biab;
+  cb.addEventListener('change', () => { R.biab = cb.checked; refresh(); }); bw.append(cb, document.createTextNode('Receta BIAB (sin lavado: todo el agua entra en el macerado)'));
+  form.appendChild(bw);
+  LISTS.forEach(([key, title, cols]) => form.appendChild(listEditor(key, title, cols)));
+}
+function listEditor(key, title, cols) {
+  const box = document.createElement('div'); const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
+  const wrap = document.createElement('div'); wrap.className = 'listwrap'; const list = document.createElement('div'); list.className = 'list'; wrap.appendChild(list); box.appendChild(wrap);
+  const tpl = cols.map(c => c[2]).join(' ') + ' 34px';
+  function draw() {
+    list.textContent = '';
+    if (R[key].length) {
+      const head = document.createElement('div'); head.className = 'lrow lhead'; head.style.gridTemplateColumns = tpl;
+      cols.forEach(c => { const s = document.createElement('span'); s.textContent = c[1]; head.appendChild(s); }); head.appendChild(document.createElement('span')); list.appendChild(head);
+    } else { const e = document.createElement('p'); e.className = 'note'; e.textContent = 'Sin datos en la receta.'; list.appendChild(e); }
+    R[key].forEach((item, idx) => {
+      const row = document.createElement('div'); row.className = 'lrow'; row.style.gridTemplateColumns = tpl;
+      cols.forEach(c => {
+        let el;
+        if (c[3] === 's') { el = document.createElement('select'); c[4].forEach(o => { const op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op); }); el.value = item[c[0]] || c[4][0][0]; el.addEventListener('change', () => { item[c[0]] = el.value; refresh(); }); }
+        else { el = document.createElement('input'); el.type = 'text'; el.value = showV(item[c[0]]); if (c[3] === 'n') el.inputMode = 'decimal'; el.addEventListener('input', () => { item[c[0]] = readV(el.value, c[3]); refresh(); }); }
+        el.setAttribute('aria-label', c[1] + ', fila ' + (idx + 1)); row.appendChild(el);
+      });
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'Quitar fila ' + (idx + 1));
+      x.addEventListener('click', () => { R[key].splice(idx, 1); draw(); refresh(); }); row.appendChild(x); list.appendChild(row);
+    });
+    const add = document.createElement('div'); const b = document.createElement('button'); b.type = 'button'; b.className = 'sec sm'; b.textContent = '+ Agregar fila';
+    b.addEventListener('click', () => { R[key].push(Object.assign({}, BLANK[key])); draw(); refresh(); }); add.appendChild(b); list.appendChild(add);
+  }
+  draw(); return box;
+}
+
+/* ---------- generar y descargar ---------- */
+function slug(s) { return (s || 'receta').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'receta'; }
+async function saveBytes(bytes, filename) {
+  let dl = null;
+  try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+  if (dl) { await dl.save({ filename, data: bytes }); return; }
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+async function build(recipe, filename, msgEl, btn) {
+  btn.disabled = true; setMsg(msgEl, 'Generando el PDF…');
+  try {
+    const A = C.analyze(recipe);
+    const out = await C.renderPdf(window.PDFLib, C.buildSpec(recipe, A));
+    await saveBytes(out.bytes, filename);
+    setMsg(msgEl, 'Listo: ' + out.pages + ' páginas y ' + out.fields + ' campos para llenar.' + (A.warn.length && !recipe._blank ? ' La ficha trae ' + A.warn.length + ' aviso(s) en la página 1.' : '') + ' Si la descarga no empezó, revisa los permisos de descarga de tu navegador.', 'ok');
+  } catch (e) {
+    if (e && e.code === 'declined') setMsg(msgEl, 'Cancelaste la descarga. Puedes volver a intentarlo.');
+    else setMsg(msgEl, 'No se pudo generar o guardar el PDF' + (e && e.message ? ': ' + e.message : '.'), 'warn');
+    console.error(e);
+  } finally { btn.disabled = false; }
+}
+function clean() {
+  const r = JSON.parse(JSON.stringify(R, (k, v) => (typeof v === 'number' && !isFinite(v)) ? '__NaN__' : v), (k, v) => v === '__NaN__' ? NaN : v);
+  const keep = { grains: ['name', 'kg'], salts: ['name', 'g'], misc: ['name', 'amt'], mash: ['tempC', 'min'], hops: ['name', 'g', 'time'], yeast: ['name', 'amt'], ferm: ['days', 'tempC'] };
+  Object.keys(keep).forEach(k => { r[k] = r[k].filter(it => keep[k].some(f => !isEmptyV(it[f]))); });
+  return r;
+}
+function generate() {
+  if (!R) return;
+  const r = clean();
+  return build(r, 'Bitacora_lote_' + slug(r.name) + '.pdf', $('genmsg'), $('gen'));
+}
+
+/* ---------- modo reporte ---------- */
+function vis() {
+  $('out').hidden = !(R && MODE === 'ficha'); $('rep').hidden = !(R && MODE === 'rep');
+  $('tab-ficha').setAttribute('aria-selected', MODE === 'ficha'); $('tab-rep').setAttribute('aria-selected', MODE === 'rep');
+}
+function setMode(m) { MODE = m; if (m === 'rep' && R) renderRepForm(); vis(); }
+const RFIELDS = [
+  ['Datos del lote', [['lote', 'Número o clave del lote', 't'], ['fecha', 'Fecha de cocción', 't'], ['cervecero', 'Cervecero responsable', 't']]],
+  ['Agua', [['strikeL', 'Agua de empaste usada (L)', 'n', (r, A) => A.water.strike], ['spargeL', 'Agua de lavado agregada (L)', 'n', (r, A) => A.water.sparge], ['topOffL', 'Agua en el fermentador (L)', 'n', (r) => isNum(r.topOffL) ? r.topOffL : 0], ['strikeC', 'Temp. agua de empaste (°C)', 'n', r => r.strikeC], ['mashPH', 'pH del macerado (a 20 °C)', 'n', r => r.mashPH]]],
+  ['Mosto y hervor', [['preL', 'Volumen antes del hervor (L)', 'n', r => r.boilL], ['preSG', 'Densidad antes del hervor (SG)', 'n', r => r.preSG], ['postL', 'Volumen después del hervor (L)', 'n', r => r.postBoilL], ['postSG', 'Densidad después del hervor (SG)', 'n', r => r.postSG]]],
+  ['Fermentador y fermentación', [['fermL', 'Volumen en el fermentador (L)', 'n', r => r.batchL], ['og', 'Densidad inicial (OG)', 'n', r => r.og], ['pitchC', 'Temp. al inocular (°C)', 'n'], ['fg', 'Densidad final (FG)', 'n', r => r.fg], ['fermDays', 'Días de fermentación', 'n']]],
+  ['Envasado', [['finalL', 'Volumen envasado (L)', 'n', r => r.finalL], ['carbVols', 'Carbonatación (vol. CO₂)', 'n', r => r.carbVols], ['primingG', 'Azúcar de priming usada (g)', 'n', r => r.primingG]]]
+];
+const RLISTS = [['grains', 'Maltas y fermentables usados (kg)', 'kg', 2], ['salts', 'Sales de agua usadas (g)', 'g', 2], ['hops', 'Lúpulos usados (g)', 'g', 1]];
+function prevText(v, d) { return isNum(v) ? 'prev. ' + (Math.round(v * Math.pow(10, d === undefined ? 3 : d)) / Math.pow(10, d === undefined ? 3 : d)) : ''; }
+function renderRepForm() {
+  SNAP = clean(); const A = C.analyze(SNAP); const f = $('rform'); f.textContent = '';
+  // conserva lo escrito si la receta no cambió de forma
+  RFIELDS.forEach(([title, fields]) => {
+    const box = document.createElement('div'); const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
+    const g = document.createElement('div'); g.className = 'fgrid';
+    fields.forEach(([key, label, t, pv]) => {
+      const d = document.createElement('div'); d.className = 'f'; const lb = document.createElement('label'); lb.htmlFor = 'rf-' + key; lb.textContent = label;
+      const inp = document.createElement('input'); inp.type = 'text'; inp.id = 'rf-' + key; if (t === 'n') inp.inputMode = 'decimal';
+      if (pv) { const v = pv(SNAP, A); if (isNum(v)) inp.placeholder = prevText(v); }
+      inp.value = REAL[key] === undefined || (typeof REAL[key] === 'number' && !isFinite(REAL[key])) ? '' : String(REAL[key]);
+      inp.addEventListener('input', () => { REAL[key] = readV(inp.value, t); });
+      d.append(lb, inp); g.appendChild(d);
+    });
+    box.appendChild(g); f.appendChild(box);
+  });
+  RLISTS.forEach(([key, title, unit, d]) => {
+    const items = SNAP[key]; if (!items.length) return;
+    const box = document.createElement('div'); const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
+    const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    if (!Array.isArray(REAL[key]) || REAL[key].length !== items.length) REAL[key] = items.map(() => NaN);
+    items.forEach((it, i) => {
+      const row = document.createElement('div'); row.className = 'rrow';
+      let lab = it.name || ('Fila ' + (i + 1)); if (key === 'salts' && it.stage) lab += ' (' + it.stage.toLowerCase() + ')';
+      if (key === 'hops') lab += ' (' + ({ boil: 'hervor', fwh: 'primer mosto', whirlpool: 'whirlpool', dry: 'dry hop', other: 'otro' }[it.kind] || 'hervor') + (isNum(it.time) ? ' ' + it.time + (it.kind === 'dry' ? ' d' : ' min') : '') + ')';
+      const l = document.createElement('label'); l.textContent = lab; const id = 'rl-' + key + i; l.htmlFor = id;
+      const pv = document.createElement('span'); pv.className = 'pv'; pv.textContent = prevText(key === 'grains' ? it.kg : it.g, d) + ' ' + unit;
+      const inp = document.createElement('input'); inp.type = 'text'; inp.inputMode = 'decimal'; inp.id = id; inp.value = isNum(REAL[key][i]) ? String(REAL[key][i]) : '';
+      inp.addEventListener('input', () => { REAL[key][i] = readV(inp.value, 'n'); });
+      row.append(l, pv, inp); wrap.appendChild(row);
+    });
+    box.appendChild(wrap); f.appendChild(box);
+  });
+  ['deviations', 'sensory'].forEach(k => {
+    const box = document.createElement('div'); const h = document.createElement('h3'); h.textContent = k === 'deviations' ? 'Desviaciones y observaciones' : 'Evaluación sensorial'; box.appendChild(h);
+    const ta = document.createElement('textarea'); ta.className = 'plain'; ta.setAttribute('aria-label', h.textContent); ta.value = REAL[k] || ''; ta.addEventListener('input', () => { REAL[k] = ta.value; }); box.appendChild(ta); f.appendChild(box);
+  });
+}
+function repData() {
+  const r = SNAP || clean(); const A = C.analyze(r); const rep = RP.computeReport(r, A, REAL); return { r, rep };
+}
+async function genRep() {
+  if (!R) return; const b = $('genrep'); b.disabled = true; setMsg($('repmsg'), 'Generando el reporte…');
+  try {
+    const { r, rep } = repData(); const out = await RP.renderReport(window.PDFLib, r, rep, REAL);
+    await saveBytes(out.bytes, 'Reporte_lote_' + slug(r.name) + '.pdf');
+    $('sumtxt').value = RP.summaryText(r, rep, REAL);
+    setMsg($('repmsg'), 'Listo: reporte de ' + out.pages + ' páginas. ' + rep.dictamen.text + ' Alertas rojas: ' + rep.alerts + ', amarillas: ' + rep.warns + '. Si la descarga no empezó, revisa los permisos de descarga de tu navegador.', rep.alerts ? 'warn' : 'ok');
+  } catch (e) {
+    if (e && e.code === 'declined') setMsg($('repmsg'), 'Cancelaste la descarga. Puedes volver a intentarlo.');
+    else setMsg($('repmsg'), 'No se pudo generar o guardar el reporte' + (e && e.message ? ': ' + e.message : '.'), 'warn');
+    console.error(e);
+  } finally { b.disabled = false; }
+}
+async function copySum() {
+  if (!R) return; const { r, rep } = repData(); const t = RP.summaryText(r, rep, REAL); $('sumtxt').value = t;
+  let done = false;
+  try { await navigator.clipboard.writeText(t); done = true; } catch (e) { done = false; }
+  if (!done) { const ta = $('sumtxt'); const d = ta.closest('details'); if (d) d.open = true; ta.focus(); ta.select(); try { done = document.execCommand('copy'); } catch (e) { done = false; } }
+  setMsg($('repmsg'), done ? 'Resumen copiado. Pégalo en la conversación con el agente para que lo interprete.' : 'No pude copiar automáticamente. El resumen quedó seleccionado abajo: cópialo con Ctrl+C o con mantener presionado.', done ? 'ok' : 'warn');
+}
+
+/* ---------- eventos ---------- */
+$('file').addEventListener('change', e => onFile(e.target.files[0]));
+$('sample').addEventListener('click', () => load(SAMPLE, 'la receta de ejemplo (Blonde Ale 120 L, BeerSmith)'));
+$('usePaste').addEventListener('click', () => { const t = $('paste').value.trim(); if (t) load(t, 'el texto pegado'); else setMsg($('msg'), 'Pega primero el texto de la receta.', 'warn'); });
+$('gen').addEventListener('click', generate);
+$('genrep').addEventListener('click', genRep);
+$('copysum').addEventListener('click', copySum);
+$('tab-ficha').addEventListener('click', () => setMode('ficha'));
+$('tab-rep').addEventListener('click', () => setMode('rep'));
+$('blank').addEventListener('click', () => build(C.blankRecipe(), 'Bitacora_plantilla_neutra.pdf', $('msg'), $('blank')));
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => onFile(e.dataTransfer.files[0]));
+})();
+</script>
+
+</body></html>
